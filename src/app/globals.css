@@ -1,0 +1,2874 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Baloo+2:wght@700;800&display=swap');
+
+/* ═══════════════════════════════════════════════════════════
+   DULCERÍAS CANDY — Tienda en línea
+
+   Principio rector: el color lo ponen los productos.
+   La marca (magenta y amarillo) vive SOLO en el encabezado,
+   en los botones de compra y en las etiquetas de precio.
+   Todo lo demás es gris neutro para que las fotos resalten.
+   ═══════════════════════════════════════════════════════════ */
+
+:root{
+  /* marca — uso restringido */
+  --marca:#EC008C;
+  --marca-osc:#C40076;
+  --amarillo:#FEDD00;
+  --uva:#3C1053;
+
+  /* interfaz — lo que domina la pantalla */
+  --fondo:#F4F1F6;
+  --tarjeta:#FFFFFF;
+  --texto:#26232B;
+  --texto-2:#5F5C68;
+  --tenue:#8E8B98;
+  --linea:#E2E1E7;
+  --linea-2:#CFCDD6;
+
+  /* semáforo comercial */
+  --verde:#00A650;
+  --naranja:#F04E23;
+
+  --sombra:0 1px 2px rgba(38,35,43,.06), 0 2px 8px rgba(38,35,43,.05);
+  --sombra-alta:0 4px 16px rgba(38,35,43,.13);
+
+  --texto-fam:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --marca-fam:'Baloo 2','Inter',system-ui,sans-serif;
+
+  --r:8px;
+  --r-lg:12px;
+  --ancho:1400px;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+[hidden]{display:none !important}
+
+html{scroll-behavior:smooth;scroll-padding-top:170px;-webkit-text-size-adjust:100%}
+
+body{
+  font-family:var(--texto-fam);
+  background:var(--fondo);
+  color:var(--texto);
+  font-size:14px;
+  line-height:1.5;
+  overflow-x:hidden;
+}
+
+img{max-width:100%;display:block}
+button,input,select{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+svg{width:1em;height:1em;fill:currentColor}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:-999px;z-index:999;background:var(--amarillo);padding:12px 20px;font-weight:600}
+.skip:focus{left:0}
+:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+
+/* ─────────── piezas reutilizables ─────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:11px 20px;border:1px solid transparent;border-radius:var(--r);
+  font-size:14px;font-weight:600;cursor:pointer;
+  transition:background .15s,border-color .15s,color .15s,box-shadow .15s;
+}
+.btn--primario{background:var(--marca);color:#fff}
+.btn--primario:hover{background:var(--marca-osc)}
+.btn--secundario{background:rgba(236,0,140,.09);color:var(--marca)}
+.btn--secundario:hover{background:rgba(236,0,140,.16)}
+.btn--wa{background:var(--verde);color:#fff}
+.btn--wa:hover{background:#008F45}
+.btn--fantasma{background:var(--tarjeta);border-color:var(--linea-2);color:var(--texto)}
+.btn--fantasma:hover{border-color:var(--texto-2)}
+.btn--bloque{width:100%}
+.btn--sm{padding:8px 14px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* Estado temporal cuando se agrega un producto */
+.btn--agregado {
+  background: var(--verde) !important;
+  color: #fff !important;
+  border-color: var(--verde) !important;
+  box-shadow: 0 3px 0 #007A3B !important;
+}
+
+.link{background:none;border:none;color:var(--marca);font-weight:600;font-size:13px;cursor:pointer}
+.link:hover{text-decoration:underline}
+.link--tenue{color:var(--tenue);font-weight:500;display:block;margin:12px auto 0}
+.pinata .link--tenue{color:rgba(255,255,255,.7)}
+
+.etiqueta{
+  font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--marca);margin-bottom:8px;
+}
+.titulo{font-family:var(--marca-fam);font-size:28px;font-weight:800;letter-spacing:-.01em}
+.subtitulo{color:var(--texto-2);margin-top:4px}
+
+/* ─────────── cinta de avisos ─────────── */
+.cinta{background:var(--uva);color:#EDE7F2;overflow:hidden;padding:9px 0}
+.cinta__pista{display:flex;width:max-content;animation:cinta 38s linear infinite}
+.cinta:hover .cinta__pista{animation-play-state:paused}
+.cinta__grupo{display:flex;align-items:center;gap:26px;padding-right:26px}
+.cinta__grupo span{font-size:13px;white-space:nowrap}
+.cinta__grupo b{color:var(--amarillo);font-weight:700}
+.cinta__grupo i{color:var(--marca);font-style:normal;font-size:11px}
+@keyframes cinta{to{transform:translateX(-50%)}}
+
+/* ─────────── encabezado ─────────── */
+.head{background:var(--marca);position:sticky;top:0;z-index:60}
+.head__in{
+  max-width:var(--ancho);margin:0 auto;padding:11px 16px;
+  display:flex;align-items:center;gap:20px;
+}
+
+/* el buscador es el elemento más grande: eso define un e-commerce */
+.buscador{flex:1;position:relative;max-width:760px}
+.buscador__caja{display:flex;background:#fff;border-radius:var(--r);overflow:hidden;box-shadow:var(--sombra)}
+.buscador__caja input{
+  flex:1;padding:12px 16px;border:none;font-size:14px;min-width:0;
+}
+.buscador__caja input::placeholder{color:var(--tenue)}
+.buscador__caja input:focus{outline:none}
+.buscador__caja input::-webkit-search-cancel-button{display:none}
+.buscador__btn{
+  width:52px;border:none;background:#fff;color:var(--texto-2);
+  cursor:pointer;font-size:18px;display:grid;place-items:center;
+  border-left:1px solid var(--linea);
+}
+.buscador__btn:hover{background:#F7F7F9;color:var(--marca)}
+
+.sug{
+  display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:70;
+  background:#fff;border-radius:var(--r);box-shadow:var(--sombra-alta);
+  overflow:hidden;max-height:min(70vh,460px);overflow-y:auto;
+}
+.sug.on{display:block}
+.sug__t{padding:12px 16px 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tenue)}
+.sug__chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 14px}
+.sug__chip{
+  padding:6px 12px;background:var(--fondo);border:1px solid var(--linea);
+  border-radius:999px;font-size:13px;cursor:pointer;
+}
+.sug__chip:hover{border-color:var(--marca);color:var(--marca)}
+.sug__it{
+  width:100%;display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;
+  padding:9px 16px;background:none;border:none;text-align:left;cursor:pointer;
+}
+.sug__it:hover,.sug__it.on{background:#FAF7FB}
+.sug__it img{width:44px;height:44px;object-fit:contain;background:var(--fondo);border-radius:6px;padding:3px}
+.sug__n{font-size:13px;font-weight:500;line-height:1.3}
+.sug__c{font-size:11px;color:var(--tenue)}
+.sug__p{font-size:14px;font-weight:600}
+.sug__nada{padding:18px 16px;color:var(--texto-2);font-size:13px}
+
+.head__acc{display:flex;align-items:center;gap:6px;margin-left:auto}
+.acc{
+  display:flex;align-items:center;gap:9px;padding:7px 12px;
+  border:none;background:none;color:#fff;cursor:pointer;border-radius:var(--r);
+  transition:background .15s;
+}
+.acc:hover{background:rgba(255,255,255,.14)}
+.acc__txt{display:flex;flex-direction:column;line-height:1.2;text-align:left}
+.acc__txt small{font-size:11px;opacity:.82}
+.acc__txt b{font-size:13px;font-weight:600}
+.acc .ico-wa{font-size:21px}
+.acc__ico{position:relative;font-size:22px;display:block}
+.acc__n{
+  position:absolute;top:-5px;right:-8px;min-width:18px;height:18px;padding:0 4px;
+  display:grid;place-items:center;background:var(--amarillo);color:var(--uva);
+  border-radius:999px;font-size:11px;font-weight:700;
+}
+
+.burger{display:none;flex-direction:column;gap:4px;padding:10px;background:none;border:none;cursor:pointer}
+.burger span{display:block;width:20px;height:2px;background:#fff;border-radius:2px;transition:transform .2s,opacity .2s}
+.burger[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.burger[aria-expanded="true"] span:nth-child(2){opacity:0}
+.burger[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+/* ─────────── barra de categorías ─────────── */
+.catnav{background:#fff;border-bottom:1px solid var(--linea);position:sticky;top:80px;z-index:55}
+.catnav__in{
+  max-width:var(--ancho);margin:0 auto;padding:0 16px;
+  display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;
+}
+.catnav__in::-webkit-scrollbar{display:none}
+.catnav__in button{
+  padding:11px 14px;background:none;border:none;cursor:pointer;
+  font-size:13px;font-weight:500;color:var(--texto-2);white-space:nowrap;
+  border-bottom:2px solid transparent;transition:color .15s,border-color .15s;
+}
+.catnav__in button:hover{color:var(--marca)}
+.catnav__in button[aria-current="true"]{color:var(--marca);border-bottom-color:var(--marca);font-weight:600}
+.catnav__in button.destacado{color:var(--naranja);font-weight:600}
+
+/* ─────────── portada ─────────── */
+.portada {
+  max-width: 100%; /* Permite que ocupe toda la pantalla */
+  margin: 0; /* Lo pega al menú de navegación de arriba */
+  padding: 0; /* Elimina los espacios blancos a los lados */
+}
+
+.banners {
+  position: relative;
+  border-radius: 0; /* Quitamos las esquinas redondas para que quede al ras de la pantalla */
+  overflow: hidden;
+  box-shadow: var(--sombra);
+}
+.banners__viewport{display:flex;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+.banner {
+  flex: 0 0 100%; 
+    
+  min-height: 100vh; 
+  
+  padding: 60px 8vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #fff;
+}
+.banner h2{font-family:var(--marca-fam);font-size:clamp(34px,5.6vw,74px);font-weight:800;line-height:1.03;max-width:16ch;margin-bottom:14px}
+.banner p{font-size:clamp(16px,1.6vw,21px);max-width:46ch;margin-bottom:32px;opacity:.94}
+.banner .btn{align-self:flex-start;background:#fff;color:var(--texto);padding:16px 34px;font-size:16px}
+.banner .btn:hover{background:var(--amarillo)}
+.banner__tag{
+  align-self:flex-start;background:rgba(255,255,255,.2);
+  padding:4px 11px;border-radius:999px;font-size:11px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px;
+}
+.banner--1{background:linear-gradient(115deg,#FF3DA6 0%,#EC008C 42%,#6A1B9A 100%)}
+.banner--2{background:linear-gradient(115deg,#22B8F0 0%,#0085CA 45%,#123E8A 100%)}
+.banner--3{background:linear-gradient(115deg,#FFA400 0%,#F04E23 48%,#A5182C 100%)}
+
+.banners__nav{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:44px;height:44px;border:none;border-radius:50%;
+  background:rgba(255,255,255,.9);color:var(--texto);
+  font-size:20px;cursor:pointer;display:grid;place-items:center;
+}
+.banners__nav:hover{background:#fff}
+.banners__nav--prev{left:12px}
+.banners__nav--next{right:12px}
+.banners__dots{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.banners__dots button{
+  width:8px;height:8px;padding:0;border:none;border-radius:999px;
+  background:rgba(255,255,255,.5);cursor:pointer;transition:width .2s,background .2s;
+}
+.banners__dots button[aria-current="true"]{background:#fff;width:22px}
+
+
+/* ─────────── accesos por categoría ─────────── */
+.rubros{max-width:var(--ancho);margin:80px auto 0;padding:20px 16px 4px}
+.rubros .titulo, .rubros .subtitulo { text-align: center; }
+.rubros .subtitulo { margin-bottom: 28px; }
+.rubros__in{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;padding-bottom:6px}
+.rubros__in::-webkit-scrollbar{display:none}
+.rubro{
+  flex:0 0 auto;width:132px;padding:18px 10px 14px;background:#fff;
+  border:2px solid var(--linea);border-radius:var(--r-lg);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  transition:border-color .18s,box-shadow .18s,transform .18s,background .18s;
+}
+.rubro:hover{
+  border-color:var(--c);background:#fff;background:color-mix(in srgb, var(--c) 7%, #fff);
+  box-shadow:var(--sombra-alta);transform:translateY(-3px);
+}
+.rubro__disco{
+  width:72px;height:72px;display:grid;place-items:center;border-radius:50%;
+  background:var(--fondo);
+  background:color-mix(in srgb, var(--c) 16%, #fff);
+  transition:transform .22s;
+}
+.rubro:hover .rubro__disco{transform:scale(1.07)}
+.rubro img{width:52px;height:52px;object-fit:contain}
+.rubro__n{font-size:14px;font-weight:700;text-align:center;line-height:1.2;color:var(--c)}
+.rubro small{font-size:11.5px;color:var(--tenue)}
+
+/* ─────────── estantes ─────────── */
+.estante{max-width:var(--ancho);margin:80px auto 0;padding:22px 16px 6px}
+.estante__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.estante__head h2{
+  font-family:var(--marca-fam);font-size:22px;font-weight:800;
+  display:flex;align-items:center;gap:10px;
+}
+.estante__head h2::before{
+  content:"";width:6px;height:22px;border-radius:3px;
+  background:linear-gradient(180deg,var(--marca),var(--amarillo));
+}
+.estante__wrap{position:relative}
+.estante__pista{
+  display:flex;gap:12px;overflow-x:auto;scroll-behavior:smooth;
+  padding-bottom:6px;scrollbar-width:none;
+}
+.estante__pista::-webkit-scrollbar{display:none}
+.estante__pista>*{flex:0 0 244px}
+.estante__nav{
+  position:absolute;top:38%;z-index:3;
+  width:34px;height:34px;border:1px solid var(--linea);border-radius:50%;
+  background:#fff;box-shadow:var(--sombra);cursor:pointer;font-size:18px;
+  display:none;place-items:center;
+}
+.estante__nav--prev{left:-14px}
+.estante__nav--next{right:-14px}
+@media (min-width:1000px){.estante__nav{display:grid}}
+
+/* ─────────── tarjeta de producto ─────────── */
+.prod{
+  background:var(--tarjeta);border:1px solid var(--linea);border-radius:var(--r);
+  overflow:hidden;display:flex;flex-direction:column;position:relative;
+  transition:box-shadow .18s,transform .18s,border-color .18s;
+}
+.prod:hover{box-shadow:var(--sombra-alta);transform:translateY(-2px);border-color:var(--linea-2)}
+
+.prod__foto{
+  display:block;width:100%;aspect-ratio:1;background:#fff;
+  border:none;cursor:pointer;padding:22px;
+}
+.prod__foto img{width:100%;height:100%;object-fit:contain;transition:transform .25s}
+.prod:hover .prod__foto img{transform:scale(1.05)}
+
+.prod__off{
+  position:absolute;top:8px;left:8px;z-index:2;
+  background:var(--naranja);color:#fff;
+  padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;
+}
+.prod__nuevo{
+  position:absolute;top:8px;left:8px;z-index:2;
+  background:var(--uva);color:#fff;
+  padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;
+}
+
+.prod__cuerpo{padding:0 16px 16px;display:flex;flex-direction:column;flex:1}
+.prod__cat{font-size:11px;color:var(--tenue);margin-bottom:4px}
+.prod__nom{
+  font-size:14px;font-weight:400;line-height:1.4;color:var(--texto);
+  margin-bottom:10px;min-height:2.8em;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.prod__antes{font-size:12px;color:var(--tenue);text-decoration:line-through}
+.prod__precio{
+  font-size:26px;font-weight:400;letter-spacing:-.02em;line-height:1.1;
+  display:flex;align-items:baseline;gap:9px;
+}
+.prod__precio i{font-style:normal;font-size:13px;font-weight:600;color:var(--verde)}
+.prod__unidad{font-size:12px;color:var(--tenue);margin-top:3px}
+.prod__envio{font-size:12.5px;font-weight:600;color:var(--verde);margin-top:8px}
+.prod__vol{font-size:11px;color:var(--texto-2);margin-top:2px}
+.prod__cta{margin-top:auto;padding-top:14px}
+
+/* ─────────── catálogo ─────────── */
+.tienda{max-width:var(--ancho);margin:80px auto 0;padding:14px 16px 30px}
+.migas{font-size:12px;color:var(--texto-2);margin-bottom:12px;display:flex;gap:7px}
+.migas a:hover{color:var(--marca);text-decoration:underline}
+
+.tienda__grid{display:grid;gap:18px;grid-template-columns:1fr}
+@media (min-width:1000px){.tienda__grid{grid-template-columns:236px 1fr}}
+
+.filtros{
+  background:#fff;border:1px solid var(--linea);border-radius:var(--r);
+  padding:18px;align-self:start;
+}
+.filtros__cerrar{display:none}
+.fbloque{padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid var(--linea)}
+.fbloque h3{font-size:13px;font-weight:700;margin-bottom:10px}
+.fbloque ul{list-style:none}
+.fbloque li button{
+  width:100%;display:flex;justify-content:space-between;gap:8px;
+  padding:6px 0;background:none;border:none;cursor:pointer;
+  font-size:13px;color:var(--texto-2);text-align:left;
+}
+.fbloque li button:hover{color:var(--marca)}
+.fbloque li button[aria-current="true"]{color:var(--marca);font-weight:700}
+.fbloque li button span:last-child{color:var(--tenue);font-size:12px}
+.fcheck{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:13px;color:var(--texto-2);cursor:pointer}
+.fcheck input{width:16px;height:16px;accent-color:var(--marca);cursor:pointer}
+
+.barra{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:#fff;border:1px solid var(--linea);border-radius:var(--r);
+  padding:10px 14px;margin-bottom:12px;flex-wrap:wrap;
+}
+.barra__n{font-size:13px;color:var(--texto-2)}
+.barra__n b{color:var(--texto)}
+.barra__acc{display:flex;align-items:center;gap:8px}
+.orden select{
+  padding:8px 12px;border:1px solid var(--linea-2);border-radius:var(--r);
+  background:#fff;font-size:13px;cursor:pointer;
+}
+#abrir-filtros{display:none}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.chips:empty{display:none}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:5px 11px;background:#fff;border:1px solid var(--linea-2);
+  border-radius:999px;font-size:12px;cursor:pointer;
+}
+.chip:hover{border-color:var(--marca);color:var(--marca)}
+.chip b{font-weight:600}
+
+.rejilla{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(228px,1fr))}
+
+.vacio{
+  background:#fff;border:1px solid var(--linea);border-radius:var(--r);
+  padding:44px 24px;text-align:center;
+}
+.vacio__ico{font-size:34px;margin-bottom:10px}
+.vacio h3{font-size:17px;margin-bottom:6px}
+.vacio p{color:var(--texto-2);margin-bottom:16px}
+
+.paginas{display:flex;justify-content:center;gap:6px;margin-top:22px;flex-wrap:wrap}
+.paginas button{
+  min-width:36px;height:36px;padding:0 10px;
+  background:#fff;border:1px solid var(--linea-2);border-radius:var(--r);
+  font-size:13px;cursor:pointer;
+}
+.paginas button:hover{border-color:var(--marca);color:var(--marca)}
+.paginas button[aria-current="true"]{background:var(--marca);border-color:var(--marca);color:#fff;font-weight:600}
+.paginas button:disabled{opacity:.4;cursor:not-allowed}
+
+/* ─────────── ficha de producto ─────────── */
+.ficha{max-width:var(--ancho);margin:0 auto;padding:14px 16px 40px}
+.ficha__caja{
+  background:#fff;border:1px solid var(--linea);border-radius:var(--r-lg);
+  display:grid;gap:0;grid-template-columns:1fr;overflow:hidden;
+}
+@media (min-width:900px){.ficha__caja{grid-template-columns:1.15fr .85fr}}
+
+.ficha__galeria{padding:28px;display:grid;place-items:center;background:#fff}
+.ficha__galeria img{max-height:400px;width:auto;object-fit:contain}
+
+.ficha__info{padding:28px;border-left:1px solid var(--linea)}
+@media (max-width:899px){.ficha__info{border-left:none;border-top:1px solid var(--linea)}}
+.ficha__cat{font-size:12px;color:var(--tenue);margin-bottom:6px}
+.ficha__nom{font-family:var(--texto-fam);font-size:22px;font-weight:600;line-height:1.3;margin-bottom:14px}
+.ficha__antes{font-size:14px;color:var(--tenue);text-decoration:line-through}
+.ficha__precio{font-size:36px;font-weight:300;letter-spacing:-.02em;line-height:1.1;margin-bottom:2px}
+.ficha__off{color:var(--verde);font-size:15px;font-weight:600;margin-left:10px}
+.ficha__unidad{font-size:13px;color:var(--texto-2);margin-bottom:14px}
+.ficha__envio{
+  display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;
+  color:var(--verde);margin-bottom:6px;
+}
+.ficha__vol{
+  background:#FFF9DE;border:1px solid #F2E28A;border-radius:var(--r);
+  padding:10px 12px;font-size:13px;margin:14px 0;
+}
+.ficha__vol b{color:var(--texto)}
+.ficha__desc{color:var(--texto-2);font-size:14px;margin:16px 0;line-height:1.6}
+
+.cantidad{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.cantidad__ctrl{display:inline-flex;align-items:center;border:1px solid var(--linea-2);border-radius:var(--r);overflow:hidden}
+.cantidad__ctrl button{width:36px;height:38px;border:none;background:#fff;font-size:17px;cursor:pointer;color:var(--marca)}
+.cantidad__ctrl button:hover{background:var(--fondo)}
+.cantidad__ctrl span{min-width:44px;text-align:center;font-weight:600}
+.cantidad small{color:var(--tenue);font-size:12px}
+
+.ficha__cta{display:grid;gap:9px}
+.ficha__meta{margin-top:18px;padding-top:16px;border-top:1px solid var(--linea);font-size:12px;color:var(--texto-2);display:grid;gap:6px}
+
+/* ─────────── llena tu piñata ─────────── */
+.pinata{max-width:var(--ancho);margin:80px auto 0;padding:0 16px}
+.pinata__in{
+  background:linear-gradient(135deg,#3C1053 0%,#7A1E86 55%,#B0157E 100%);
+  border-radius:var(--r-lg);color:#fff;
+  padding:30px;display:grid;gap:28px;grid-template-columns:1fr;
+  box-shadow:var(--sombra);
+}
+.pinata .etiqueta{color:var(--amarillo)}
+.pinata__txt{color:rgba(255,255,255,.85)}
+.pinata__estado{color:#fff}
+@media (min-width:900px){.pinata__in{grid-template-columns:340px 1fr}}
+.pinata h2{font-family:var(--marca-fam);font-size:24px;font-weight:800;margin-bottom:6px}
+.pinata__txt{margin-bottom:18px}
+.pinata__escena{position:relative;display:grid;place-items:center;margin-bottom:12px}
+.pinata__escena img{width:min(220px,70%);height:auto;animation:colgar 4.5s ease-in-out infinite;transform-origin:50% 8%}
+@keyframes colgar{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+.pinata__n{
+  position:absolute;top:0;right:8%;min-width:42px;height:42px;padding:0 9px;
+  display:grid;place-items:center;background:var(--amarillo);color:var(--uva);
+  border-radius:999px;font-weight:700;font-size:17px;box-shadow:var(--sombra);
+}
+.pinata__estado{text-align:center;font-weight:600;margin-bottom:8px}
+.pinata__barra{height:8px;background:rgba(255,255,255,.22);border-radius:999px;overflow:hidden;margin-bottom:16px}
+.pinata__barra i{display:block;height:100%;width:0;background:var(--amarillo);border-radius:999px;transition:width .4s}
+.pinata__lista{list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:16px;max-height:220px;overflow-y:auto;padding-right:4px}
+.pieza{
+  display:grid;grid-template-columns:30px 1fr auto auto;gap:9px;align-items:center;
+  background:rgba(255,255,255,.14);border-radius:6px;padding:5px 8px;font-size:12px;
+}
+.pieza img{width:30px;height:30px;object-fit:contain}
+.pieza b{background:var(--amarillo);color:var(--uva);border-radius:999px;padding:1px 7px;font-size:11px;font-weight:700}
+.pieza button{border:none;background:none;cursor:pointer;color:rgba(255,255,255,.65);font-size:12px}
+.pieza button:hover{color:#fff}
+.pinata__cta{display:grid;gap:9px}
+@media (min-width:520px){.pinata__cta{grid-template-columns:1fr 1fr}}
+
+.dulces{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));max-height:440px;overflow-y:auto;padding-right:4px}
+.dulce{
+  padding:11px 8px;background:#fff;border:1px solid transparent;border-radius:var(--r);
+  color:var(--texto);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;
+  transition:border-color .15s,transform .12s,box-shadow .15s;
+}
+.dulce:hover{border-color:var(--amarillo);transform:translateY(-2px);box-shadow:var(--sombra-alta)}
+.dulce:active{transform:scale(.96)}
+.dulce img{width:46px;height:46px;object-fit:contain}
+.dulce span{font-size:11px;line-height:1.25;color:var(--texto-2)}
+.dulce b{font-size:13px;font-weight:600}
+
+.vuelo{position:fixed;z-index:200;pointer-events:none;width:50px;height:50px;will-change:transform,opacity}
+.vuelo img{width:100%;height:100%;object-fit:contain}
+
+/* ─────────── garantías ─────────── */
+.garantias{max-width:var(--ancho);margin:80px auto 0;padding:0 16px}
+.garantias__in{
+  background:#fff;border:1px solid var(--linea);border-radius:var(--r-lg);
+  display:grid;gap:1px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  overflow:hidden;
+}
+.gar{padding:22px 20px;display:flex;flex-direction:column;gap:2px;box-shadow:0 0 0 1px var(--linea)}
+.gar span{
+  display:grid;place-items:center;width:46px;height:46px;border-radius:14px;
+  font-size:22px;margin-bottom:10px;
+  background:var(--fondo);
+  background:color-mix(in srgb, var(--c,#EC008C) 14%, #fff);
+}
+.gar b{color:var(--texto)}
+.gar b{font-size:14px}
+.gar small{color:var(--texto-2);font-size:12px}
+
+/* ─────────── marcas ─────────── */
+.marcas{max-width:var(--ancho);margin:80px auto 0;padding:0 16px}
+.marcas__t{font-family:var(--marca-fam);font-size:28px;font-weight:800;color:var(--texto);text-align:center;margin-bottom:20px}
+.marcas__viewport {
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  padding: 48px 0;
+  
+  /* 🔥 Rosa pastel exacto de la marca */
+  background: #FDF0F7;
+  background: color-mix(in srgb, var(--marca) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--marca) 25%, #fff);
+  box-shadow: var(--sombra);
+  
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent);
+}
+.marcas__pista{display:flex;width:max-content;gap:80px;animation:correr 65s linear infinite;align-items:center}
+.marcas:hover .marcas__pista{animation-play-state:paused}
+/* a color y grandes: son marcas reconocibles, esconderlas en gris
+   desperdicia el respaldo que le dan a la tienda */
+.marca{display:grid;place-items:center;flex:0 0 auto;transition:transform .2s;background:transparent}
+.marca:hover{transform:scale(1.07);transform:translateY(-2px) rotate(-1.5deg)}
+.marca img{height:115px;width:auto;max-width:260px;object-fit:contain}
+/* respaldo: si el PNG no existe se dibuja el nombre, para que la
+   cinta nunca quede con huecos vacíos */
+.marca b{display:none}
+.marca.sin-foto b{
+  display:block;white-space:nowrap;
+  font-family:var(--marca-fam);font-size:32px;font-weight:800;
+  color:var(--c);padding:14px 24px;background:#fff;
+  border:2px solid var(--linea-2);
+  border-color:color-mix(in srgb, var(--c) 30%, #fff);
+  border-radius:999px;box-shadow:var(--sombra);
+}
+@keyframes correr{to{transform:translateX(-50%)}}
+
+/* ─────────── sucursales ─────────── */
+.sucursales{max-width:var(--ancho);margin:80px auto 0;padding:0 16px}
+.sucursales .titulo,.sucursales .subtitulo{text-align:center}
+.sucursales__grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));margin-top:18px}
+.suc{background:#fff;border:1px solid var(--linea);border-radius:var(--r-lg);overflow:hidden}
+.suc__mapa{height:180px;border-bottom:1px solid var(--linea)}
+.suc__mapa iframe{width:100%;height:100%;border:0;display:block}
+.suc__cuerpo{padding:16px 18px 20px}
+.suc__cuerpo h3{font-size:16px;margin-bottom:9px}
+.suc__cuerpo ul{list-style:none;display:grid;gap:5px}
+.suc__cuerpo li{font-size:13px;color:var(--texto-2);padding-left:14px;position:relative}
+.suc__cuerpo li::before{content:"";position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%;background:var(--marca)}
+.nueva{background:var(--amarillo);color:var(--uva);font-size:10px;font-weight:700;padding:1px 7px;border-radius:999px;margin-left:5px}
+
+/* ─────────── preguntas ─────────── */
+.faq{max-width:840px;margin:80px auto 0;padding:0 16px}
+.faq .titulo{text-align:center}
+.faq__lista{display:grid;gap:8px;margin-top:18px}
+.qa{background:#fff;border:1px solid var(--linea);border-radius:var(--r);overflow:hidden}
+.qa__q{
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:15px 18px;background:none;border:none;cursor:pointer;text-align:left;
+  font-size:14px;font-weight:600;
+}
+.qa__q:hover{background:#FAFAFB}
+.qa__i{
+  width:24px;height:24px;flex:none;display:grid;place-items:center;
+  background:var(--fondo);border-radius:50%;font-size:15px;color:var(--marca);
+  transition:transform .22s;
+}
+.qa.on .qa__i{transform:rotate(45deg)}
+.qa__a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s}
+.qa__a>p{overflow:hidden;padding:0 18px;color:var(--texto-2);font-size:13.5px;line-height:1.6}
+.qa.on .qa__a{grid-template-rows:1fr}
+.qa.on .qa__a>p{padding:0 18px 18px}
+
+/* ─────────── barra móvil ─────────── */
+.movil{
+  position:fixed;left:10px;right:10px;bottom:10px;z-index:45;
+  display:none;align-items:center;justify-content:space-between;gap:12px;
+  background:var(--texto);color:#fff;border-radius:var(--r-lg);
+  padding:10px 10px 10px 16px;box-shadow:var(--sombra-alta);
+}
+.movil div{display:flex;flex-direction:column;line-height:1.25}
+.movil b{font-size:13px}
+.movil span{font-size:12px;opacity:.75}
+
+/* ─────────── carrito ─────────── */
+.velo{position:fixed;inset:0;background:rgba(38,35,43,.5);z-index:90}
+.carrito{
+  position:fixed;top:0;right:0;bottom:0;z-index:95;width:min(420px,100%);
+  display:flex;flex-direction:column;background:#fff;
+  box-shadow:-6px 0 24px rgba(0,0,0,.16);animation:entrar .28s cubic-bezier(.4,0,.2,1);
+}
+@keyframes entrar{from{transform:translateX(100%)}to{transform:none}}
+.carrito__head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--linea)}
+.carrito__head h2{font-size:17px;font-weight:700}
+.cerrar{width:32px;height:32px;border:none;background:var(--fondo);border-radius:50%;cursor:pointer;font-size:13px}
+.cerrar:hover{background:var(--linea)}
+.carrito__cuerpo{flex:1;overflow-y:auto;padding:14px 18px}
+.carrito__lista{list-style:none;display:grid;gap:10px}
+
+.item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--linea)}
+.item:last-child{border-bottom:none}
+.item__foto{width:56px;height:56px;background:var(--fondo);border-radius:6px;padding:4px}
+.item__foto img{width:100%;height:100%;object-fit:contain}
+.item__n{font-size:13px;line-height:1.35;margin-bottom:2px}
+.item__u{font-size:11px;color:var(--tenue)}
+.item__q{display:inline-flex;align-items:center;border:1px solid var(--linea-2);border-radius:6px;margin-top:7px;overflow:hidden}
+.item__q button{width:26px;height:26px;border:none;background:#fff;cursor:pointer;color:var(--marca);font-size:14px}
+.item__q button:hover{background:var(--fondo)}
+.item__q span{min-width:30px;text-align:center;font-size:13px;font-weight:600}
+.item__hint{font-size:11px;color:var(--texto-2);margin-top:5px}
+.item__hint--on{color:var(--verde);font-weight:600}
+.item__der{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.item__x{border:none;background:none;color:var(--tenue);cursor:pointer;font-size:12px}
+.item__x:hover{color:var(--naranja)}
+.item__antes{font-size:11px;color:var(--tenue);text-decoration:line-through}
+.item__p{font-size:15px;font-weight:600}
+.item__p--off{color:var(--verde)}
+
+.carrito__vacio{text-align:center;padding:50px 20px}
+.carrito__vacio p:first-child{font-size:34px;margin-bottom:10px}
+.carrito__vacio h3{font-size:16px;margin-bottom:6px}
+.carrito__vacio p{color:var(--texto-2);font-size:13px;margin-bottom:16px}
+
+.carrito__pie{padding:16px 18px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--linea);background:#fff}
+.fila{display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px;color:var(--texto-2)}
+.fila--off{color:var(--verde);font-weight:600}
+.fila--total{font-size:19px;font-weight:700;color:var(--texto);padding-top:10px;border-top:1px solid var(--linea);margin-top:4px}
+.carrito__nota{font-size:11px;color:var(--tenue);margin:2px 0 12px}
+.meta{background:var(--fondo);border-radius:var(--r);padding:10px 12px;margin-bottom:14px}
+.meta p{font-size:12px;font-weight:500;margin-bottom:7px}
+.meta__barra{height:6px;background:#fff;border-radius:999px;overflow:hidden}
+.meta__barra i{display:block;height:100%;background:var(--verde);border-radius:999px;transition:width .4s}
+
+/* ─────────── avisos ─────────── */
+.avisos{position:fixed;right:14px;bottom:14px;z-index:120;display:grid;gap:8px;pointer-events:none}
+.aviso{
+  display:flex;align-items:center;gap:10px;background:var(--texto);color:#fff;
+  padding:11px 16px;border-radius:var(--r);font-size:13px;
+  box-shadow:var(--sombra-alta);animation:entrar .25s ease;max-width:320px;
+}
+.aviso.sale{animation:salir .25s ease forwards}
+@keyframes salir{to{opacity:0;transform:translateX(110%)}}
+
+/* ─────────── responsivo ─────────── */
+@media (max-width:1000px){
+  .head__in{flex-wrap:wrap;gap:10px}
+  .head::after{display:none}   /* el menú deja de ir pegado abajo */
+  .marca{padding:5px 9px}
+  .marca img{height:34px}
+  .marca img{height:38px}
+  .buscador{order:3;flex:1 0 100%;max-width:none}
+  .acc__txt{display:none}
+  .burger{display:flex}
+  .catnav{top:auto;position:static}
+  .catnav__in{max-height:0;overflow:hidden;flex-direction:column;transition:max-height .3s,padding .3s}
+  .catnav__in.on{max-height:420px;padding:8px 16px 14px;overflow-y:auto}
+  .catnav__in button{border-bottom:none;border-left:2px solid transparent;padding:11px 12px}
+  .catnav__in button[aria-current="true"]{border-left-color:var(--marca);background:#FFF5FB}
+
+  .filtros{
+    position:fixed;top:0;left:0;bottom:0;z-index:96;width:min(300px,86%);
+    border-radius:0;overflow-y:auto;transform:translateX(-100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  .filtros.on{transform:none}
+  .filtros__cerrar{
+    display:grid;place-items:center;position:absolute;top:12px;right:12px;
+    width:30px;height:30px;border:none;background:var(--fondo);border-radius:50%;cursor:pointer;
+  }
+  #abrir-filtros{display:inline-flex}
+  .movil.on{display:flex}
+  body.con-pedido{padding-bottom:74px}
+}
+
+@media (max-width:560px){
+  .marca img{height:76px;max-width:180px}
+  .marcas__pista{gap:46px}
+  .marcas__t{font-size:22px}
+  .marcas__viewport{padding:30px 0}
+  .rejilla{grid-template-columns:repeat(2,1fr);gap:10px}
+  .prod__foto{padding:14px}
+  .prod__cuerpo{padding:0 11px 12px}
+  .prod__nom{font-size:13px;min-height:2.6em}
+  .estante__pista>*{flex:0 0 172px}
+  .banner{min-height:210px;padding:26px 22px}
+  .prod__precio{font-size:19px}
+  .avisos{left:14px;bottom:82px}
+  .aviso{max-width:none}
+  .ficha__galeria{padding:20px}
+  .ficha__info{padding:20px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.01ms !important;scroll-behavior:auto !important;
+  }
+}
+
+@media print{
+  .head,.cinta,.catnav,.fab,.movil,.carrito,.velo,.avisos,.banners,.filtros{display:none !important}
+  body{background:#fff}
+}
+
+/* ─────────── cómo comprar ─────────── */
+.pasos{
+  margin:80px 0 0;padding:60px 16px;
+  background:linear-gradient(180deg,#F8F1FB,#F1E7F7);
+  border-top:1px solid #E7D9EF;border-bottom:1px solid #E7D9EF;
+}
+.pasos>.titulo,.pasos>.subtitulo{text-align:center;max-width:var(--ancho);margin-inline:auto}
+.pasos__lista{
+  list-style:none;display:grid;gap:16px;margin:26px auto 0;
+  max-width:var(--ancho);
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+}
+.paso{
+  position:relative;overflow:hidden;background:#fff;
+  border-radius:var(--r-lg);padding:30px 22px 24px;
+  box-shadow:var(--sombra);
+  transition:box-shadow .18s,transform .18s;
+}
+.paso::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:var(--c)}
+/* el número vive detrás como marca de agua: da color sin gritar */
+.paso::after{
+  content:attr(data-n);position:absolute;right:-6px;bottom:-30px;
+  font-family:var(--marca-fam);font-size:108px;font-weight:800;
+  color:#F0EDF3;
+  color:color-mix(in srgb, var(--c) 12%, #fff);line-height:1;pointer-events:none;
+}
+.paso:hover{box-shadow:var(--sombra-alta);transform:translateY(-3px)}
+.paso__n{
+  position:absolute;top:16px;right:16px;
+  width:30px;height:30px;display:grid;place-items:center;
+  background:var(--c);color:#fff;border-radius:50%;
+  font-size:14px;font-weight:700;z-index:2;
+}
+.paso__ico{
+  display:grid;place-items:center;width:56px;height:56px;
+  border-radius:16px;font-size:27px;margin-bottom:14px;
+  background:var(--fondo);
+  background:color-mix(in srgb, var(--c) 14%, #fff);
+  position:relative;z-index:2;
+}
+.paso h3{font-size:16px;font-weight:700;margin-bottom:6px;position:relative;z-index:2}
+.paso p{font-size:13.5px;color:var(--texto-2);line-height:1.55;position:relative;z-index:2}
+
+/* ─────────── botón flotante de WhatsApp ─────────── */
+.fab{
+  position:fixed;right:18px;bottom:18px;z-index:80;
+  width:58px;height:58px;display:grid;place-items:center;
+  background:var(--marca);color:#fff;border-radius:50%;
+  box-shadow:0 6px 20px rgba(236,0,140,.42);
+  transition:transform .18s,box-shadow .18s,background .18s;
+}
+.fab svg{width:31px;height:31px}
+.fab:hover{background:var(--marca-osc);transform:scale(1.07);box-shadow:0 8px 26px rgba(236,0,140,.5)}
+.fab::after{
+  content:"";position:absolute;inset:0;border-radius:50%;
+  border:2px solid var(--marca);
+  animation:pulso 2.6s ease-out infinite;
+}
+@keyframes pulso{
+  0%{transform:scale(1);opacity:.7}
+  70%{transform:scale(1.5);opacity:0}
+  100%{opacity:0}
+}
+.fab__globo{
+  position:absolute;right:calc(100% + 12px);white-space:nowrap;
+  background:var(--texto);color:#fff;font-size:12.5px;font-weight:600;
+  padding:8px 13px;border-radius:var(--r);
+  opacity:0;pointer-events:none;transform:translateX(8px);
+  transition:opacity .2s,transform .2s;
+}
+.fab:hover .fab__globo{opacity:1;transform:none}
+
+/* la barra móvil del pedido y el botón no deben encimarse */
+@media (max-width:1000px){
+  .fab{bottom:84px;width:52px;height:52px}
+  .fab svg{width:27px;height:27px}
+  .fab__globo{display:none}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CAPA DE DISEÑO
+   La personalidad vive en el marco: encabezado, bandas,
+   títulos, separadores y pie. La retícula de productos, los
+   filtros y los precios se quedan quietos para que el sitio
+   siga leyéndose como tienda y no como catálogo.
+   ═══════════════════════════════════════════════════════════ */
+
+:root{
+  --crema:#FFF7E8;
+  --lavanda:#F7EFFB;
+  --menta:#EEF9F2;
+  --confeti:
+    radial-gradient(circle at 14% 18%, rgba(236,0,140,.10) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 68% 9%,  rgba(254,221,0,.20) 0 6px, transparent 6.5px),
+    radial-gradient(circle at 88% 34%, rgba(0,133,202,.10) 0 4px, transparent 4.5px),
+    radial-gradient(circle at 38% 47%, rgba(247,148,29,.11) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 8%  68%, rgba(254,221,0,.16) 0 4px, transparent 4.5px),
+    radial-gradient(circle at 57% 78%, rgba(236,0,140,.09) 0 6px, transparent 6.5px),
+    radial-gradient(circle at 92% 88%, rgba(60,16,83,.07)  0 4px, transparent 4.5px),
+    radial-gradient(circle at 27% 93%, rgba(0,133,202,.09) 0 5px, transparent 5.5px);
+}
+
+/* ── 1. encabezado ──
+   Nada de rayas diagonales: amarillo y naranja a 45° se leen
+   como cinta de obra. El remate es una orilla festoneada —el
+   papel picado de cualquier fiesta— con el magenta colgando
+   sobre el blanco del menú. */
+.head{
+  position:sticky;
+  background:linear-gradient(178deg,#F5219C 0%,var(--marca) 55%,#D4007E 100%);
+}
+/* brillo suave: le quita la sensación de plancha plana */
+.head::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 130% at 30% 0%, rgba(255,255,255,.16), transparent 70%),
+    repeating-linear-gradient(-58deg, rgba(255,255,255,.05) 0 26px, transparent 26px 52px);
+}
+.head__in{position:relative;z-index:2}
+
+.head::after{
+  content:"";position:absolute;left:0;right:0;bottom:-13px;height:14px;
+  pointer-events:none;z-index:3;
+  background-image:radial-gradient(circle at 13px 0, #D4007E 11.5px, transparent 12px);
+  background-size:26px 14px;background-repeat:repeat-x;
+}
+
+
+/* ── 2. bandas de sección ──
+   El fondo deja de ser un gris plano: cada bloque se monta
+   sobre el anterior con esquinas redondeadas. */
+.banda{position:relative;border-radius:44px 44px 0 0;margin-top:-24px;padding:64px 0}
+/* la banda ya aporta el aire de arriba: la primera sección no
+   debe sumar su propio margen de 80px encima */
+.banda > section:first-of-type{margin-top:0}
+.banda--crema{background:var(--crema);background-image:var(--confeti);background-size:240px 240px}
+.banda--lavanda{background:var(--lavanda)}
+.banda--menta{background:var(--menta)}
+.banda--blanca{background:#fff}
+
+/* ── 3. títulos con subrayado de dulce ── */
+.titulo{position:relative;display:inline-block;padding-bottom:12px}
+.titulo::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:7px;border-radius:999px;
+  background:linear-gradient(90deg,var(--marca),var(--amarillo));
+}
+.centrado{text-align:center}
+.centrado .subtitulo{margin-top:14px}
+
+.antetitulo{
+  display:inline-flex;align-items:center;gap:7px;
+  background:#fff;border:2px solid var(--amarillo);border-radius:999px;
+  padding:6px 15px;margin-bottom:12px;
+  font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--uva);box-shadow:0 2px 0 rgba(60,16,83,.08);
+}
+
+/* ── 4. encabezados de estante ── */
+.estante__head h2::before{
+  width:auto;height:auto;padding:5px 12px;border-radius:999px;
+  content:"★";background:var(--amarillo);color:var(--uva);
+  font-size:13px;line-height:1;display:grid;place-items:center;
+}
+
+/* ── 5. tarjeta de producto ──
+   Aquí la contención es deliberada: el color entra como halo
+   detrás del producto y como cinta lateral, nunca invadiendo
+   el precio ni el nombre. La retícula sigue siendo legible. */
+.prod{border-radius:14px}
+.prod::before{
+  content:"";position:absolute;top:0;left:0;bottom:0;width:4px;z-index:2;
+  background:var(--c,var(--marca));opacity:0;transition:opacity .2s;
+}
+.prod:hover::before{opacity:1}
+.prod__foto{
+  background:#fff;
+  background:radial-gradient(circle at 50% 58%, #FDF0F7 0%, #fff 68%);
+  background:radial-gradient(circle at 50% 58%,
+    color-mix(in srgb, var(--c,#EC008C) 15%, #fff) 0%, #fff 68%);
+}
+.prod__cat{
+  display:inline-block;color:var(--c,var(--marca));
+  font-weight:700;letter-spacing:.03em;text-transform:uppercase;font-size:10.5px;
+}
+
+/* el descuento como calcomanía pegada, no como etiqueta cuadrada */
+.prod__off{
+  top:10px;left:10px;border-radius:999px;padding:6px 11px;
+  font-size:11.5px;font-weight:800;letter-spacing:.02em;
+  transform:rotate(-7deg);
+  box-shadow:0 2px 0 rgba(0,0,0,.18);
+}
+.prod__nuevo{
+  top:10px;left:10px;border-radius:999px;padding:6px 11px;
+  transform:rotate(-7deg);box-shadow:0 2px 0 rgba(0,0,0,.18);
+}
+
+/* ── 6. fichas de categoría a color pleno ── */
+.rubro{
+  background:var(--c);border-color:var(--c);color:#fff;
+  box-shadow:0 4px 0 rgba(0,0,0,.28);
+  box-shadow:0 4px 0 color-mix(in srgb, var(--c) 65%, #000);
+}
+.rubro:hover{
+  background:var(--c);border-color:var(--c);
+  transform:translateY(-3px);
+  box-shadow:0 7px 0 rgba(0,0,0,.28);
+  box-shadow:0 7px 0 color-mix(in srgb, var(--c) 65%, #000);
+}
+.rubro__disco{background:rgba(255,255,255,.9)}
+.rubro:hover .rubro__disco{background:#fff}
+.rubro__n{color:#fff}
+.rubro small{color:rgba(255,255,255,.85)}
+
+/* ── 7. pasos: la banda ya trae color, las tarjetas se aligeran ── */
+.pasos{background:transparent;border:none;margin:0;padding:0 16px 8px}
+
+/* ── 8. garantías con más presencia ── */
+.garantias__in{border:none;background:transparent;gap:14px;box-shadow:none}
+.gar{
+  background:#fff;border-radius:var(--r-lg);box-shadow:var(--sombra);
+  border-top:5px solid var(--c,var(--marca));
+}
+
+
+/* ── 10. botones con un poco más de cuerpo ── */
+.btn{border-radius:999px}
+.btn--primario{box-shadow:0 3px 0 var(--marca-osc)}
+.btn--primario:hover{box-shadow:0 2px 0 var(--marca-osc);transform:translateY(1px)}
+.btn--wa{box-shadow:0 3px 0 #007A3B}
+.btn--wa:hover{box-shadow:0 2px 0 #007A3B;transform:translateY(1px)}
+
+@media (max-width:560px){
+  .banda{border-radius:30px 30px 0 0;padding:46px 0;margin-top:-18px}
+  .head::after{height:10px;bottom:-9px;background-size:20px 10px;
+    background-image:radial-gradient(circle at 10px 0, #D4007E 8.5px, transparent 9px)}
+}
+
+/* ═══════════ PIE DE PÁGINA ═══════════
+   Cierra la página en oscuro y remata con la misma orilla
+   festoneada del encabezado. Los iconos de redes van en
+   círculo blanco con su color original: en blanco sobre
+   fondo oscuro se perdían por completo. */
+.pie{
+  position:relative;margin-top:0;color:#EDE7F2;
+  background:var(--uva);
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(236,0,140,.20) 0 6px, transparent 6.5px),
+    radial-gradient(circle at 70% 10%, rgba(254,221,0,.16) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 88% 62%, rgba(0,133,202,.16) 0 6px, transparent 6.5px),
+    radial-gradient(circle at 32% 78%, rgba(247,148,29,.14) 0 5px, transparent 5.5px),
+    linear-gradient(180deg,#4A1566,#2E0C42);
+  background-size:260px 260px,260px 260px,260px 260px,260px 260px,auto;
+}
+.pie::before{
+  content:"";position:absolute;top:-13px;left:0;right:0;height:14px;pointer-events:none;
+  background-image:radial-gradient(circle at 13px 14px, #4A1566 11.5px, transparent 12px);
+  background-size:26px 14px;background-repeat:repeat-x;
+}
+
+/* llamada final */
+.pie__cta{border-bottom:1px solid rgba(255,255,255,.14)}
+.pie__cta-in{
+  max-width:var(--ancho);margin:0 auto;padding:40px 16px;
+  display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+}
+.pie__cta h2{
+  font-family:var(--marca-fam);font-size:clamp(24px,3vw,34px);font-weight:800;
+  color:#fff;margin-bottom:6px;
+}
+.pie__cta p{color:rgba(237,231,242,.8);font-size:14.5px}
+.pie__cta-btns{display:flex;gap:12px;flex-wrap:wrap}
+.btn--amarillo{background:var(--amarillo);color:var(--uva);box-shadow:0 3px 0 #D4B800}
+.btn--amarillo:hover{background:#FFE95C;box-shadow:0 2px 0 #D4B800;transform:translateY(1px)}
+
+/* columnas */
+.pie__in{
+  max-width:var(--ancho);margin:0 auto;padding:44px 16px 38px;
+  display:grid;gap:34px;
+  grid-template-columns:1fr;
+}
+@media (min-width:700px){.pie__in{grid-template-columns:1.5fr 1fr 1fr 1.2fr}}
+
+.pie__logo{
+  display:inline-block;
+  margin-bottom:16px;
+}
+.pie__logo img{height:58px;width:auto}
+.pie__col p{font-size:13.5px;color:rgba(237,231,242,.78);line-height:1.6;margin-bottom:8px}
+.pie__col h4{
+  font-family:var(--marca-fam);font-size:17px;font-weight:800;
+  color:var(--amarillo);margin-bottom:16px;
+}
+.pie__col a,.pie__col button{
+  display:block;font-size:13.5px;color:rgba(237,231,242,.78);
+  margin-bottom:10px;background:none;border:none;cursor:pointer;
+  text-align:left;padding:0;transition:color .15s,transform .15s;
+}
+.pie__col a:hover,.pie__col button:hover{color:var(--amarillo);transform:translateX(3px)}
+
+.pie__rotulo{
+  font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:rgba(237,231,242,.55);margin:20px 0 12px !important;
+}
+
+/* redes transparentes y texto en blanco */
+.pie__redes{display:flex;gap:12px;flex-wrap:wrap}
+.pie__redes a{
+  display:flex;align-items:center;gap:9px;margin:0;
+  background:transparent;
+  padding:9px 16px 9px 0;
+  transition:transform .16s;
+}
+.pie__redes a:hover{transform:translateY(-3px);}
+
+/* Quitamos el filtro para que se vean los colores y formas originales */
+.pie__redes img{
+  width:24px;
+  height:24px;
+  object-fit:contain;
+  filter:none;
+}
+
+.pie__redes span{
+  font-size:13px;
+  font-weight:700;
+  color:#fff;
+}
+
+/* contacto */
+.pie__tel{margin-bottom:18px !important}
+.pie__tel b{display:block;font-family:var(--marca-fam);font-size:22px;color:#fff;font-weight:800}
+.pie__tel small{display:block;font-size:12px;color:rgba(237,231,242,.6)}
+.pie__tel:hover b{color:var(--amarillo)}
+.pie__horario{font-size:13px;margin-bottom:10px !important}
+.pie__horario b{display:block;color:#fff;font-weight:600}
+
+/* formas de pago y entrega */
+.pie__pago{
+  max-width:var(--ancho);margin:0 auto;padding:20px 16px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  border-top:1px solid rgba(255,255,255,.14);
+  font-size:12px;color:rgba(237,231,242,.6);
+}
+.pie__pago b{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);
+  color:#fff;border-radius:6px;padding:6px 12px;font-weight:600;font-size:12px;
+}
+.pie__pago-sep{width:1px;height:20px;background:rgba(255,255,255,.18);margin:0 6px}
+
+.pie__legal{
+  text-align:center;padding:18px 16px 24px;font-size:12px;
+  color:rgba(237,231,242,.5);border-top:1px solid rgba(255,255,255,.14);
+}
+
+.head__in{
+ padding: 6px 16px !important; /*reduce el espacio arriba y abajo de toda la barra*/
+ z-index: 10 !important;
+}
+
+
+.marca img {
+  height: 52px !important; /*se hace chico ligeramente el logo*/
+}
+
+.buscador__caja input {
+  padding: 10px 18px !important; /*se hace el campo de texto mas delgado*/
+}
+
+.buscador__btn {
+  background: var(--amarillo) !important;
+  color: var(--uva) !important;
+  width: 56px !important;
+  border-left: none !important;
+}
+
+.buscador__btn:hover {
+  background: #FFE95C !important;
+}
+
+/*---------SCROLL PERSONALIZADO-----------*/
+
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fondo);
+}
+
+::-webkit-scrollbar-thumb{
+  background: var(--marca);
+  border-radius: 10px;
+  border: 3px solid var(--fondo);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--marca-osc);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SISTEMA DE DISEÑO CORPORATIVO MINI-ERP — DULCERÍAS CANDY
+   Mantiene la paleta oficial (--uva, --marca, --amarillo, --fondo)
+   con estética ejecutiva de software empresarial.
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes erpFadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes erpPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.45); opacity: 0.55; }
+}
+
+.erp-anim-1 { animation: erpFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.erp-anim-2 { animation: erpFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.erp-anim-3 { animation: erpFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.10s both; }
+.erp-anim-4 { animation: erpFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+
+/* Botones ejecutivos dentro del ERP y Login */
+.erp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-family: var(--texto-fam);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 1px solid transparent;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.erp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.erp-btn--primario {
+  background: var(--marca);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(236, 0, 140, 0.25);
+}
+
+.erp-btn--primario:hover:not(:disabled) {
+  background: var(--marca-osc);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(236, 0, 140, 0.3);
+}
+
+.erp-btn--uva {
+  background: var(--uva);
+  color: #fff;
+}
+
+.erp-btn--uva:hover:not(:disabled) {
+  background: #4E166B;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(60, 16, 83, 0.25);
+}
+
+.erp-btn--secundario {
+  background: #fff;
+  border-color: var(--linea-2);
+  color: var(--texto);
+}
+
+.erp-btn--secundario:hover:not(:disabled) {
+  border-color: var(--marca);
+  color: var(--marca);
+  background: #FDF7FA;
+  transform: translateY(-1px);
+}
+
+.erp-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Layout General del ERP */
+.erp-shell {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  min-height: 100vh;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--texto-fam);
+}
+
+/* Sidebar Corporativo */
+.erp-sidebar {
+  background: #270A36;
+  background-image: linear-gradient(180deg, var(--uva) 0%, #220830 100%);
+  color: #EDE7F2;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 12px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.erp-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 6px 10px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 12px;
+}
+
+.erp-sidebar__brand img {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+}
+
+.erp-sidebar__tag {
+  display: inline-block;
+  background: rgba(254, 221, 0, 0.16);
+  color: var(--amarillo);
+  border: 1px solid rgba(254, 221, 0, 0.35);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.erp-nav__grupo {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(237, 231, 242, 0.45);
+  margin: 16px 10px 6px;
+}
+
+.erp-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(237, 231, 242, 0.78);
+  transition: all 0.18s ease;
+  margin-bottom: 3px;
+  border: 1px solid transparent;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.erp-nav__link:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  transform: translateX(3px);
+}
+
+.erp-nav__link--activo {
+  background: rgba(236, 0, 140, 0.16);
+  border-color: rgba(236, 0, 140, 0.4);
+  color: #fff;
+  font-weight: 600;
+}
+
+.erp-nav__link--activo::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 20%;
+  bottom: 20%;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--marca);
+}
+
+.erp-nav__code {
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Topbar Ejecutiva */
+.erp-topbar {
+  height: 64px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--linea);
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.erp-main {
+  padding: 28px;
+  max-width: 1400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Encabezado de Página Corporativo */
+.erp-page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 20px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--linea);
+}
+
+.erp-page-title {
+  font-family: var(--texto-fam);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--texto);
+  margin-top: 4px;
+}
+
+.erp-page-subtitle {
+  font-size: 13px;
+  color: var(--texto-2);
+  margin-top: 2px;
+}
+
+/* Tarjetas y Contenedores */
+.erp-card {
+  background: var(--tarjeta);
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(38, 35, 43, 0.04);
+  margin-bottom: 20px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.erp-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--linea);
+}
+
+.erp-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--texto);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-card--interactiva {
+  cursor: pointer;
+}
+
+.erp-card--interactiva:hover {
+  border-color: var(--marca);
+  box-shadow: 0 8px 20px rgba(38, 35, 43, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Tarjetas de Indicadores (KPIs Ejecutivos) */
+.erp-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.erp-kpi {
+  background: var(--tarjeta);
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(38, 35, 43, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.erp-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(38, 35, 43, 0.07);
+  border-color: var(--linea-2);
+}
+
+.erp-kpi__ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--c, var(--marca));
+  background: color-mix(in srgb, var(--c, #EC008C) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--c, #EC008C) 20%, #fff);
+}
+
+.erp-kpi__valor {
+  font-family: var(--texto-fam);
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  color: var(--texto);
+  line-height: 1.15;
+  margin: 12px 0 4px;
+}
+
+/* Inputs Corporativos */
+.erp-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto);
+  margin-bottom: 6px;
+}
+
+.erp-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--linea-2);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13.5px;
+  color: var(--texto);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.erp-input:hover {
+  border-color: #B0AEB8;
+}
+
+.erp-input:focus {
+  outline: none;
+  border-color: var(--marca);
+  box-shadow: 0 0 0 3px rgba(236, 0, 140, 0.12);
+}
+
+/* Tablas de Datos */
+.erp-tabla-wrap {
+  background: var(--tarjeta);
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  overflow-x: auto;
+  box-shadow: 0 1px 3px rgba(38, 35, 43, 0.04);
+}
+
+.erp-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.erp-tabla thead tr {
+  background: #F9F8FB;
+  border-bottom: 1px solid var(--linea);
+  color: var(--texto-2);
+  text-align: left;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.erp-tabla th {
+  padding: 11px 16px;
+  font-weight: 700;
+}
+
+.erp-tabla td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--linea);
+  color: var(--texto);
+  vertical-align: middle;
+}
+
+.erp-tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.erp-tabla tbody tr:hover {
+  background: #FCF9FD;
+}
+
+/* Insignias de Estatus */
+.erp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.erp-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: erpPulse 2s infinite;
+}
+
+.erp-badge--verde { background: #E8F7EF; color: #007A3B; border: 1px solid #BFEAD2; }
+.erp-badge--naranja { background: #FDECE8; color: #C8320A; border: 1px solid #F7C5B8; }
+.erp-badge--uva { background: #F4ECF8; color: var(--uva); border: 1px solid #DEC8EA; }
+.erp-badge--marca { background: #FCE8F4; color: var(--marca-osc); border: 1px solid #F6BFE0; }
+.erp-badge--amarillo { background: #FFF9DB; color: #7A5E00; border: 1px solid #F3E08B; }
+
+/* Botón selector de rol en el Login */
+.erp-rol-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  color: #fff;
+  transition: all 0.18s ease;
+}
+
+.erp-rol-btn:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: var(--amarillo);
+  transform: translateX(4px);
+}
+
+@media (max-width: 960px) {
+  .erp-shell { grid-template-columns: 1fr; }
+  .erp-sidebar { position: static; height: auto; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BIENVENIDA GLOBAL DEL ERP — HERO, LOGO Y RELOJ EN VIVO
+   ═══════════════════════════════════════════════════════════ */
+
+.erp-sidebar {
+  padding-bottom: 56px !important;
+}
+
+@keyframes erpLogoFloat {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50%      { transform: translateY(-5px) scale(1.02); }
+}
+
+@keyframes erpGlowMove {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(18px, -12px) scale(1.08); }
+}
+
+.erp-welcome-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  min-height: 250px;
+  background: linear-gradient(135deg, #240733 0%, var(--uva) 52%, #5E146E 100%);
+  color: #fff;
+  padding: 44px 46px;
+  margin-bottom: 26px;
+  box-shadow: 0 18px 40px rgba(60, 16, 83, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 38px;
+}
+
+/* Luces ambientales animadas en el fondo del banner */
+.erp-welcome-hero::before {
+  content: "";
+  position: absolute;
+  top: -35%;
+  right: 18%;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(236, 0, 140, 0.35) 0%, transparent 70%);
+  animation: erpGlowMove 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.erp-welcome-hero::after {
+  content: "";
+  position: absolute;
+  bottom: -40%;
+  left: 8%;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(254, 221, 0, 0.18) 0%, transparent 70%);
+  animation: erpGlowMove 10s ease-in-out infinite reverse;
+  pointer-events: none;
+}
+
+/* Logo limpio SIN recuadro de fondo y con tamaño controlado */
+.erp-welcome-logo-box {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  display: grid;
+  place-items: center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.erp-welcome-logo-box:hover {
+  transform: scale(1.05);
+}
+
+.erp-welcome-logo-box img {
+  height: 105px !important;
+  width: auto !important;
+  max-width: 195px !important;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.42));
+  animation: erpLogoFloat 4.5s ease-in-out infinite;
+}
+
+/* Bloque central de saludo */
+.erp-welcome-info {
+  position: relative;
+  z-index: 2;
+}
+
+.erp-welcome-saludo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(254, 221, 0, 0.15);
+  border: 1px solid rgba(254, 221, 0, 0.4);
+  color: var(--amarillo);
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.erp-welcome-nombre {
+  font-family: var(--texto-fam);
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.erp-welcome-nombre span {
+  color: var(--amarillo);
+}
+
+/* Tarjeta del Reloj Corporativo en Vivo */
+.erp-welcome-clock {
+  position: relative;
+  z-index: 2;
+  background: rgba(18, 5, 27, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  padding: 22px 26px;
+  min-width: 275px;
+  text-align: right;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.erp-welcome-clock__hora {
+  font-family: var(--texto-fam);
+  font-size: 38px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: #fff;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.erp-welcome-clock__seg {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--amarillo);
+  min-width: 28px;
+}
+
+.erp-welcome-clock__fecha {
+  font-size: 12.5px;
+  color: rgba(237, 231, 242, 0.78);
+  text-transform: capitalize;
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.erp-welcome-clock__corte {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .erp-welcome-hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: 32px 24px;
+    gap: 22px;
+  }
+  .erp-welcome-logo-box {
+    margin: 0 auto;
+  }
+  .erp-welcome-clock {
+    text-align: center;
+  }
+  .erp-welcome-clock__hora,
+  .erp-welcome-clock__corte {
+    justify-content: center;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MEJORAS UX/UI OPTIMIZADAS: DRAWER CON SALIDA ANIMADA,
+   BANNERS DE FONDO COMPLETO Y ESTRUCTURA COMPACTA
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes erpPageEnter {
+  0%   { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: none; }
+}
+
+.erp-page-transition {
+  animation: erpPageEnter 0.2s ease-out;
+}
+
+/* Acordeón fluido */
+.erp-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    grid-template-rows 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease,
+    transform 0.28s ease,
+    margin-bottom 0.28s ease;
+  margin-bottom: 0;
+  pointer-events: none;
+}
+
+.erp-collapse.abierto {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: none;
+  margin-bottom: 18px;
+  pointer-events: auto;
+}
+
+.erp-collapse__inner {
+  overflow: hidden;
+}
+
+/* Selectores modernos */
+.erp-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 9px 36px 9px 12px;
+  border: 1.5px solid var(--linea-2);
+  border-radius: 9px;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%233C1053' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.erp-select:hover {
+  border-color: var(--uva);
+  background-color: #FCF9FD;
+}
+
+.erp-select:focus {
+  outline: none;
+  border-color: var(--marca);
+  box-shadow: 0 0 0 3px rgba(236, 0, 140, 0.14);
+}
+
+/* Control segmentado */
+.erp-segmented {
+  display: inline-flex;
+  background: #ECEAEF;
+  padding: 4px;
+  border-radius: 10px;
+  gap: 4px;
+}
+
+.erp-segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--texto-2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.erp-segmented button.activo {
+  background: #fff;
+  color: var(--uva);
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(38, 35, 43, 0.1);
+}
+
+/* Catálogo de productos */
+.erp-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
+  gap: 18px;
+}
+
+.erp-sku-card {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 6px rgba(38, 35, 43, 0.04);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  cursor: pointer;
+}
+
+.erp-sku-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 28px rgba(60, 16, 83, 0.1);
+  border-color: var(--marca);
+}
+
+.erp-sku-card__top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.erp-sku-card__img {
+  width: 68px;
+  height: 68px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #FAF7FB, #F1EDF5);
+  border: 1px solid var(--linea);
+  padding: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 0.22s ease;
+}
+
+.erp-sku-card:hover .erp-sku-card__img {
+  transform: scale(1.06);
+}
+
+.erp-sku-card__img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-sku-card__metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  background: #F9F8FB;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+/* ══════════ DRAWER LATERAL CON ANIMACIÓN DE ENTRADA Y DE SALIDA ══════════ */
+@keyframes erpBackdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes erpBackdropOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes erpDrawerSlideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes erpDrawerSlideOut {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+
+.erp-drawer-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: rgba(26, 10, 38, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9999 !important;
+  display: flex;
+  justify-content: flex-end;
+  animation: erpBackdropIn 0.26s ease forwards;
+}
+
+.erp-drawer-backdrop.cerrando {
+  animation: erpBackdropOut 0.26s ease forwards;
+  pointer-events: none;
+}
+
+.erp-drawer {
+  width: min(500px, 100%);
+  height: 100vh;
+  background: #fff;
+  box-shadow: -12px 0 40px rgba(24, 6, 36, 0.28);
+  display: flex;
+  flex-direction: column;
+  animation: erpDrawerSlideIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.erp-drawer.cerrando {
+  animation: erpDrawerSlideOut 0.26s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.erp-drawer__head {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--linea);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FCF9FD;
+  flex-shrink: 0;
+}
+
+.erp-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.erp-drawer__foot {
+  padding: 16px 24px;
+  border-top: 1px solid var(--linea);
+  background: #fff;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ══════════ SIMULADOR DE BANNER FIEL A LA TIENDA (IMAGEN DE FONDO COMPLETO) ══════════ */
+.erp-banner-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  min-height: 250px;
+  padding: 36px 48px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  box-shadow: 0 12px 30px rgba(38, 35, 43, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: background-image 0.3s ease;
+}
+
+.erp-banner-stage__tag {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.erp-banner-stage__title {
+  font-family: var(--marca-fam);
+  font-size: clamp(26px, 3vw, 38px);
+  font-weight: 800;
+  line-height: 1.08;
+  margin-bottom: 10px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+.erp-banner-stage__desc {
+  font-size: 14.5px;
+  color: rgba(255, 255, 255, 0.92);
+  line-height: 1.5;
+  max-width: 52ch;
+  margin-bottom: 18px;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.25);
+}
+
+.erp-banner-stage__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  color: #26232B;
+  font-weight: 700;
+  font-size: 13.5px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+/* ══════════ TARJETA COMPACTA DE EDICIÓN DE BANNER (SIN ESPACIOS SEPARADOS) ══════════ */
+.erp-banner-row {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 18px;
+  align-items: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.erp-banner-row.activo-preview {
+  border-color: var(--marca);
+  box-shadow: 0 8px 22px rgba(236, 0, 140, 0.1);
+}
+
+.erp-banner-row__thumb {
+  position: relative;
+  width: 100%;
+  height: 124px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+
+.erp-banner-row__fields {
+  display: grid;
+  grid-template-columns: 1.2fr 0.9fr 170px;
+  gap: 12px;
+  align-items: end;
+}
+
+/* Stepper Almacén PEPS */
+.erp-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid var(--linea-2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.erp-stepper button {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: #F8F6FA;
+  color: var(--uva);
+  font-weight: 800;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.erp-stepper button:hover:not(:disabled) {
+  background: var(--marca);
+  color: #fff;
+}
+
+.erp-stepper input {
+  width: 54px;
+  height: 30px;
+  border: none;
+  border-left: 1px solid var(--linea);
+  border-right: 1px solid var(--linea);
+  text-align: center;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+@media (max-width: 920px) {
+  .erp-banner-row {
+    grid-template-columns: 1fr;
+  }
+  .erp-banner-row__fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   NOTIFICACIÓN FLOTANTE INFERIOR (TOAST GLOBAL ERP)
+   Y TARJETAS INTUITIVAS DE ROTACIÓN PEPS
+   ═══════════════════════════════════════════════════════════ */
+
+@keyframes erpToastUp {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 24px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes erpToastDown {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 20px) scale(0.95);
+  }
+}
+
+@keyframes erpToastProgress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* Contenedor flotante fijo en la parte inferior de la pantalla */
+.erp-toast {
+  position: fixed !important;
+  bottom: 28px !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+  z-index: 10000 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(30, 8, 43, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 999px;
+  box-shadow: 0 14px 36px rgba(24, 6, 36, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.14);
+  font-size: 13.5px;
+  font-weight: 600;
+  pointer-events: auto;
+  overflow: hidden;
+  max-width: min(92vw, 620px);
+  animation: erpToastUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.erp-toast.saliendo {
+  animation: erpToastDown 0.24s ease forwards;
+}
+
+.erp-toast__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.erp-toast--exito .erp-toast__icon {
+  background: #00A650;
+  color: #fff;
+}
+
+.erp-toast--error .erp-toast__icon {
+  background: #F04E23;
+  color: #fff;
+}
+
+.erp-toast__bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--amarillo), var(--marca));
+  animation: erpToastProgress 3.2s linear forwards;
+}
+
+/* Rotación suave del ícono "+" al abrir un formulario desplegable */
+.erp-icon-rotate {
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.erp-icon-rotate.abierto {
+  transform: rotate(45deg);
+}
+
+/* ══════════ TARJETAS INTUITIVAS DE COLA PEPS (ALMACÉN 2 NORTE) ══════════ */
+.erp-peps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.erp-peps-card {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 2px 6px rgba(38, 35, 43, 0.04);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+  position: relative;
+}
+
+.erp-peps-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px rgba(60, 16, 83, 0.09);
+  border-color: #D2C4DC;
+}
+
+.erp-peps-card--primero {
+  border-color: rgba(0, 166, 80, 0.45);
+  background: linear-gradient(180deg, rgba(232, 247, 239, 0.35) 0%, #fff 38%);
+}
+
+.erp-peps-card__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  background: #F9F8FB;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  padding: 11px 13px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CATÁLOGO CORPORATIVO DE ALTA DENSIDAD (ESCALABLE A 500+ PRODUCTOS)
+   ═══════════════════════════════════════════════════════════ */
+
+.erp-adv-filters {
+  display: grid;
+  grid-template-columns: 1.5fr repeat(4, minmax(140px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.erp-preset-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.erp-preset-chip {
+  padding: 6px 11px;
+  border-radius: 6px;
+  border: 1px solid var(--linea-2);
+  background: #fff;
+  color: var(--texto);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.erp-preset-chip:hover {
+  border-color: var(--uva);
+  color: var(--uva);
+  background: #FAF8FC;
+}
+
+.erp-preset-chip.activo {
+  background: var(--uva);
+  color: #fff;
+  border-color: var(--uva);
+}
+
+/* 1. Estructura Maestro-Detalle para Categorías (Índice lateral + Catálogo) */
+.erp-cat-workspace {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.erp-cat-directory {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 10px;
+  position: sticky;
+  top: 84px;
+  box-shadow: 0 1px 3px rgba(38, 35, 43, 0.03);
+}
+
+.erp-cat-directory__head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--tenue);
+  padding: 6px 10px 10px;
+  border-bottom: 1px solid var(--linea);
+  margin-bottom: 6px;
+}
+
+.erp-cat-dir-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--texto);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 2px;
+}
+
+.erp-cat-dir-btn:hover {
+  background: #F6F4F8;
+}
+
+.erp-cat-dir-btn.activo {
+  background: #F3EDF7;
+  border-color: #D8C5E5;
+  color: var(--uva);
+  font-weight: 700;
+}
+
+.erp-cat-dir-count {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--texto-2);
+  background: #F1EFF4;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.erp-cat-dir-btn.activo .erp-cat-dir-count {
+  background: var(--uva);
+  color: #fff;
+}
+
+/* 2. Contenedor de Sección de Categoría (Sobrio y Corporativo) */
+.erp-cat-panel {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(38, 35, 43, 0.03);
+}
+
+.erp-cat-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #FAFAFC;
+  border-bottom: 1px solid var(--linea);
+}
+
+.erp-cat-panel__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.erp-cat-panel__title h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--texto);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.erp-cat-panel__meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--texto-2);
+}
+
+/* 3. Grid y Tarjetas Horizontales de Alta Densidad (Para 500 productos) */
+.erp-dense-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.erp-prod-row-card {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.erp-prod-row-card:hover {
+  border-color: var(--uva);
+  box-shadow: 0 4px 12px rgba(38, 35, 43, 0.06);
+  transform: translateY(-1px);
+}
+
+.erp-prod-row-card__thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background: #F8F7FA;
+  border: 1px solid var(--linea);
+  padding: 5px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.erp-prod-row-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-prod-row-card__info {
+  min-width: 0;
+}
+
+.erp-prod-row-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--tenue);
+  margin-bottom: 2px;
+}
+
+.erp-prod-row-card__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  color: var(--texto-2);
+}
+
+.erp-prod-row-card__name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--texto);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.erp-prod-row-card__pres {
+  font-size: 11.5px;
+  color: var(--texto-2);
+}
+
+.erp-prod-row-card__right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.erp-prod-row-card__price {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--texto);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.erp-prod-row-card__disc {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #FCE8F4;
+  color: var(--marca-osc);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.erp-prod-row-card__stock {
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 4. Barra de Paginación Empresarial */
+.erp-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  padding: 12px 18px;
+  margin-top: 16px;
+}
+
+.erp-pagination__btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-page-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--linea-2);
+  background: #fff;
+  color: var(--texto);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.erp-page-btn:hover:not(:disabled) {
+  border-color: var(--uva);
+  color: var(--uva);
+}
+
+.erp-page-btn.activo {
+  background: var(--uva);
+  border-color: var(--uva);
+  color: #fff;
+}
+
+.erp-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1120px) {
+  .erp-adv-filters {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .erp-cat-workspace {
+    grid-template-columns: 1fr;
+  }
+  .erp-cat-directory {
+    position: static;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   APARTADO DE DADOS DE BAJA (ARCHIVO) Y BITÁCORA DE AUDITORÍA
+   ═══════════════════════════════════════════════════════════ */
+
+/* Tarjetas de productos dados de baja */
+.erp-archived-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.erp-archived-card {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-left: 4px solid #F04E23;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 2px 6px rgba(38, 35, 43, 0.04);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.erp-archived-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(38, 35, 43, 0.08);
+}
+
+.erp-archived-reason-box {
+  background: #FAF8FC;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Recuadro de confirmación de baja dentro del Drawer lateral */
+.erp-baja-confirm-box {
+  background: #FFF8F6;
+  border: 1.5px solid #F7C5B8;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Comparador visual Valor Anterior -> Valor Nuevo en la Bitácora */
+.erp-audit-diff {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+
+.erp-audit-old {
+  background: #FDECE8;
+  color: #C8320A;
+  padding: 2px 7px;
+  border-radius: 5px;
+  text-decoration: line-through;
+}
+
+.erp-audit-new {
+  background: #E8F7EF;
+  color: #007A3B;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DISEÑO EJECUTIVO DE BANNERS: RESUMEN LIMPIO + EDITOR EN 2 BLOQUES
+   ═══════════════════════════════════════════════════════════ */
+
+.erp-banner-card {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.erp-banner-card.activo-preview {
+  border-color: var(--uva);
+  box-shadow: 0 8px 24px rgba(60, 16, 83, 0.08);
+}
+
+.erp-banner-card.editando {
+  border-color: var(--marca);
+  box-shadow: 0 10px 28px rgba(236, 0, 140, 0.12);
+}
+
+/* Cabecera limpia de lectura rápida */
+.erp-banner-card__summary {
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 210px 1fr auto;
+  gap: 20px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.erp-banner-card__thumb {
+  position: relative;
+  width: 210px;
+  height: 108px;
+  border-radius: 10px;
+  background-size: cover;
+  background-position: center;
+  padding: 10px 12px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.erp-banner-card__meta-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.erp-banner-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #F6F4F9;
+  border: 1px solid var(--linea);
+  color: var(--texto-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 7px;
+}
+
+/* Panel desplegable interno dividido en 2 bloques claros */
+.erp-banner-card__config {
+  background: #FAF8FC;
+  border-top: 1px solid var(--linea);
+  padding: 20px;
+}
+
+.erp-banner-config-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.erp-banner-config-box {
+  background: #fff;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.erp-banner-config-box__title {
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--uva);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--linea);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 980px) {
+  .erp-banner-card__summary {
+    grid-template-columns: 1fr;
+  }
+  .erp-banner-card__thumb {
+    width: 100%;
+    height: 130px;
+  }
+  .erp-banner-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
