@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import ErpIcon from '@/components/erp/ErpIcon';
+import ErpSelect from '@/components/erp/ErpSelect';
+import ErpDatePicker from '@/components/erp/ErpDatePicker';
+import ErpImageUpload from '@/components/erp/ErpImageUpload';
 
 const FONDOS_ORIGINALES = [
   'linear-gradient(125deg, #EC008C 0%, #C6007E 55%, #7A1E86 100%)',
@@ -45,6 +48,11 @@ const DESTINOS_BANNER = [
   { valor: '#marca:La Poblana', etiqueta: 'Marca: La Poblana' },
   { valor: '#marca:La Perla', etiqueta: 'Marca: La Perla' }
 ];
+
+const OPCIONES_DESTINO_BANNER = DESTINOS_BANNER.map(d => ({
+  value: d.valor,
+  label: d.etiqueta
+}));
 
 const MOTIVOS_BAJA = [
   'Fin de temporada',
@@ -297,7 +305,6 @@ export default function CatalogoAdminPage() {
     };
   }, [prodSeleccionado]);
 
-  // Carga el banner en el simulador superior y desliza suavemente la pantalla hasta él
   function previsualizarBannerArriba(idBanner) {
     setBannerEnSimulador(idBanner);
     const contenedorSimulador = document.getElementById('simulador-banner-vivo');
@@ -835,8 +842,7 @@ export default function CatalogoAdminPage() {
     return await archivoADataUrl(archivo);
   }
 
-  async function subirFotoProducto(e, esInspector = false) {
-    const archivo = e.target.files?.[0];
+  async function subirFotoProducto(archivo, esInspector = false) {
     if (!archivo) return;
 
     try {
@@ -914,8 +920,7 @@ export default function CatalogoAdminPage() {
     }
   }
 
-  function seleccionarFondoBannerLocal(e, idPromocion = null) {
-    const archivo = e.target.files?.[0];
+  function seleccionarFondoBannerLocal(archivo, idPromocion = null) {
     if (!archivo) return;
 
     const urlTemporal = URL.createObjectURL(archivo);
@@ -1104,6 +1109,37 @@ export default function CatalogoAdminPage() {
     cargarDatos();
   }
 
+  // Opciones preparadas para ErpSelect
+  const opcionesCatConTodas = [
+    { value: 'todas', label: `Todas (${categorias.length})`, badge: productosActivos.length },
+    ...categorias.map(c => ({
+      value: String(c.id_categoria),
+      label: c.nombre_categoria,
+      badge: productosActivos.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
+    }))
+  ];
+
+  const opcionesCatSimples = categorias.map(c => ({
+    value: String(c.id_categoria),
+    label: c.nombre_categoria,
+    badge: productosActivos.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
+  }));
+
+  const opcionesMarcaConTodas = [
+    { value: 'todas', label: 'Todas las marcas' },
+    ...marcasDisponibles.map(m => ({
+      value: m,
+      label: m,
+      badge: productosActivos.filter(p => (p.marca || '').toLowerCase() === m.toLowerCase()).length
+    }))
+  ];
+
+  const opcionesMarcaSimples = marcasDisponibles.map(m => ({
+    value: m,
+    label: m,
+    badge: productosActivos.filter(p => (p.marca || '').toLowerCase() === m.toLowerCase()).length
+  }));
+
   function renderTarjetaProductoCompacta(p) {
     const vig = evaluarVigenciaDescuento(p);
     const precioBase = Number(p.precio_unitario || 0);
@@ -1269,16 +1305,19 @@ export default function CatalogoAdminPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
             <span style={{ color: 'var(--texto-2)' }}>Mostrar:</span>
-            <select
-              className="erp-select"
-              style={{ width: 92, padding: '5px 28px 5px 10px', fontSize: 12 }}
-              value={porPagina}
-              onChange={e => setPorPagina(Number(e.target.value))}
-            >
-              <option value={24}>24</option>
-              <option value={48}>48</option>
-              <option value={96}>96</option>
-            </select>
+            <div style={{ width: 84 }}>
+              <ErpSelect
+                compact
+                searchable={false}
+                value={String(porPagina)}
+                onChange={val => setPorPagina(Number(val))}
+                options={[
+                  { value: '24', label: '24' },
+                  { value: '48', label: '48' },
+                  { value: '96', label: '96' }
+                ]}
+              />
+            </div>
           </div>
 
           <div className="erp-pagination__btns">
@@ -1527,55 +1566,39 @@ export default function CatalogoAdminPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14, alignItems: 'end' }}>
                   <div>
                     <label className="erp-label">1. Aplicar descuento por:</label>
-                    <select
-                      className="erp-select"
+                    <ErpSelect
                       value={descMasivo.alcance}
-                      onChange={e => setDescMasivo({ ...descMasivo, alcance: e.target.value })}
-                    >
-                      <option value="categoria">Categoría completa</option>
-                      <option value="marca">Marca comercial</option>
-                      <option value="todos">Todos los productos activos ({productosActivos.length})</option>
-                      <option value="filtrados">Productos filtrados actualmente ({productosFiltrados.length})</option>
-                    </select>
+                      onChange={val => setDescMasivo({ ...descMasivo, alcance: val })}
+                      options={[
+                        { value: 'categoria', label: 'Categoría completa' },
+                        { value: 'marca', label: 'Marca comercial' },
+                        { value: 'todos', label: 'Todos los productos activos', badge: productosActivos.length },
+                        { value: 'filtrados', label: 'Productos filtrados actualmente', badge: productosFiltrados.length }
+                      ]}
+                    />
                   </div>
 
                   {descMasivo.alcance === 'categoria' && (
                     <div>
                       <label className="erp-label">2. Categoría objetivo:</label>
-                      <select
-                        className="erp-select"
+                      <ErpSelect
                         value={descMasivo.id_categoria}
-                        onChange={e => setDescMasivo({ ...descMasivo, id_categoria: e.target.value })}
-                      >
-                        {categorias.map(c => {
-                          const totalCat = productosActivos.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length;
-                          return (
-                            <option key={c.id_categoria} value={c.id_categoria}>
-                              {c.nombre_categoria} ({totalCat} activos)
-                            </option>
-                          );
-                        })}
-                      </select>
+                        onChange={val => setDescMasivo({ ...descMasivo, id_categoria: val })}
+                        searchPlaceholder="Buscar categoría..."
+                        options={opcionesCatSimples}
+                      />
                     </div>
                   )}
 
                   {descMasivo.alcance === 'marca' && (
                     <div>
                       <label className="erp-label">2. Marca objetivo:</label>
-                      <select
-                        className="erp-select"
+                      <ErpSelect
                         value={descMasivo.marca}
-                        onChange={e => setDescMasivo({ ...descMasivo, marca: e.target.value })}
-                      >
-                        {marcasDisponibles.map(m => {
-                          const totalMarca = productosActivos.filter(p => (p.marca || '').toLowerCase() === m.toLowerCase()).length;
-                          return (
-                            <option key={m} value={m}>
-                              {m} ({totalMarca} activos)
-                            </option>
-                          );
-                        })}
-                      </select>
+                        onChange={val => setDescMasivo({ ...descMasivo, marca: val })}
+                        searchPlaceholder="Buscar marca..."
+                        options={opcionesMarcaSimples}
+                      />
                     </div>
                   )}
 
@@ -1610,35 +1633,31 @@ export default function CatalogoAdminPage() {
                 <div style={{ marginTop: 16, padding: 14, background: '#FAF8FC', borderRadius: 10, border: '1px solid var(--linea)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14, alignItems: 'end' }}>
                   <div>
                     <label className="erp-label">4. Duración de la promoción:</label>
-                    <select
-                      className="erp-select"
+                    <ErpSelect
                       value={descMasivo.modalidadVigencia}
-                      onChange={e => setDescMasivo({ ...descMasivo, modalidadVigencia: e.target.value })}
-                    >
-                      <option value="programado">Programar fechas (Regresa solo a precio normal a las 00:00)</option>
-                      <option value="permanente">Permanente (Hasta retirarlo manualmente)</option>
-                    </select>
+                      onChange={val => setDescMasivo({ ...descMasivo, modalidadVigencia: val })}
+                      options={[
+                        { value: 'programado', label: 'Programar fechas (Regresa a precio normal 00:00)' },
+                        { value: 'permanente', label: 'Permanente (Hasta retirarlo manualmente)' }
+                      ]}
+                    />
                   </div>
 
                   {descMasivo.modalidadVigencia === 'programado' && (
                     <>
                       <div>
                         <label className="erp-label">Fecha de inicio (00:00 hrs):</label>
-                        <input
-                          type="date"
-                          className="erp-input"
+                        <ErpDatePicker
                           value={descMasivo.fecha_inicio}
-                          onChange={e => setDescMasivo({ ...descMasivo, fecha_inicio: e.target.value })}
+                          onChange={val => setDescMasivo({ ...descMasivo, fecha_inicio: val })}
                         />
                       </div>
                       <div>
                         <label className="erp-label">Fecha límite (Termina a las 23:59 hrs) *:</label>
-                        <input
-                          type="date"
-                          min={descMasivo.fecha_inicio || hoyStr}
-                          className="erp-input"
+                        <ErpDatePicker
                           value={descMasivo.fecha_fin}
-                          onChange={e => setDescMasivo({ ...descMasivo, fecha_fin: e.target.value })}
+                          min={descMasivo.fecha_inicio || hoyStr}
+                          onChange={val => setDescMasivo({ ...descMasivo, fecha_fin: val })}
                         />
                       </div>
                     </>
@@ -1703,15 +1722,21 @@ export default function CatalogoAdminPage() {
                   </div>
                   <div>
                     <label className="erp-label">Categoría *</label>
-                    <select className="erp-select" value={nuevoProd.id_categoria} onChange={e => setNuevoProd({ ...nuevoProd, id_categoria: Number(e.target.value) })}>
-                      {categorias.map(c => <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>)}
-                    </select>
+                    <ErpSelect
+                      value={String(nuevoProd.id_categoria)}
+                      onChange={val => setNuevoProd({ ...nuevoProd, id_categoria: Number(val) })}
+                      searchPlaceholder="Buscar categoría..."
+                      options={opcionesCatSimples}
+                    />
                   </div>
                   <div>
                     <label className="erp-label">Marca *</label>
-                    <select className="erp-select" value={nuevoProd.marca} onChange={e => setNuevoProd({ ...nuevoProd, marca: e.target.value })}>
-                      {marcasDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                    <ErpSelect
+                      value={nuevoProd.marca}
+                      onChange={val => setNuevoProd({ ...nuevoProd, marca: val })}
+                      searchPlaceholder="Buscar marca..."
+                      options={opcionesMarcaSimples}
+                    />
                   </div>
                   <div>
                     <label className="erp-label">Presentación *</label>
@@ -1744,7 +1769,13 @@ export default function CatalogoAdminPage() {
 
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label className="erp-label">Fotografía del Producto</label>
-                    <input type="file" accept="image/*" className="erp-input" style={{ padding: 7 }} onChange={e => subirFotoProducto(e, false)} />
+                    <ErpImageUpload
+                      previewUrl={resolverImagenProducto(nuevoProd.imagen_url)}
+                      title="Fotografía para la tienda en línea"
+                      subtitle="Arrastra una imagen aquí o haz clic para seleccionarla · PNG sin fondo o WEBP"
+                      buttonLabel="Subir fotografía"
+                      onFileSelect={archivo => subirFotoProducto(archivo, false)}
+                    />
                   </div>
                 </div>
 
@@ -1761,7 +1792,7 @@ export default function CatalogoAdminPage() {
             </div>
           </div>
 
-          {/* BARRA DE FILTRADO AVANZADO */}
+          {/* BARRA DE FILTRADO AVANZADO CON ErpSelect */}
           <div className="erp-card erp-anim-2" style={{ padding: '16px 20px', marginBottom: 18 }}>
             <div className="erp-adv-filters">
               <div>
@@ -1782,54 +1813,66 @@ export default function CatalogoAdminPage() {
 
               <div>
                 <label className="erp-label">Categoría</label>
-                <select className="erp-select" value={filtroCat} onChange={e => setFiltroCat(e.target.value)}>
-                  <option value="todas">Todas ({categorias.length})</option>
-                  {categorias.map(c => (
-                    <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>
-                  ))}
-                </select>
+                <ErpSelect
+                  value={filtroCat}
+                  onChange={setFiltroCat}
+                  searchPlaceholder="Buscar categoría..."
+                  options={opcionesCatConTodas}
+                />
               </div>
 
               <div>
                 <label className="erp-label">Marca</label>
-                <select className="erp-select" value={filtroMarca} onChange={e => setFiltroMarca(e.target.value)}>
-                  <option value="todas">Todas las marcas</option>
-                  {marcasDisponibles.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                <ErpSelect
+                  value={filtroMarca}
+                  onChange={setFiltroMarca}
+                  searchPlaceholder="Buscar marca..."
+                  options={opcionesMarcaConTodas}
+                />
               </div>
 
               <div>
                 <label className="erp-label">Disponibilidad</label>
-                <select className="erp-select" value={filtroStock} onChange={e => setFiltroStock(e.target.value)}>
-                  <option value="todos">Todo el inventario</option>
-                  <option value="disponible">Disponibles (&gt; 0)</option>
-                  <option value="bajo">Existencia baja (≤ 10)</option>
-                  <option value="agotado">Agotados (0)</option>
-                </select>
+                <ErpSelect
+                  value={filtroStock}
+                  onChange={setFiltroStock}
+                  options={[
+                    { value: 'todos', label: 'Todo el inventario' },
+                    { value: 'disponible', label: 'Disponibles (> 0)' },
+                    { value: 'bajo', label: 'Existencia baja (≤ 10)' },
+                    { value: 'agotado', label: 'Agotados (0)' }
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="erp-label">Promoción</label>
-                <select className="erp-select" value={filtroOferta} onChange={e => setFiltroOferta(e.target.value)}>
-                  <option value="todos">Todos los precios</option>
-                  <option value="con_descuento">Con descuento vigente</option>
-                  <option value="sin_descuento">Precio regular (0%)</option>
-                  <option value="vencidos">Ofertas vencidas</option>
-                </select>
+                <ErpSelect
+                  value={filtroOferta}
+                  onChange={setFiltroOferta}
+                  options={[
+                    { value: 'todos', label: 'Todos los precios' },
+                    { value: 'con_descuento', label: 'Con descuento vigente' },
+                    { value: 'sin_descuento', label: 'Precio regular (0%)' },
+                    { value: 'vencidos', label: 'Ofertas vencidas' }
+                  ]}
+                />
               </div>
 
               <div>
                 <label className="erp-label">Ordenar por</label>
-                <select className="erp-select" value={ordenPor} onChange={e => setOrdenPor(e.target.value)}>
-                  <option value="categoria">Categoría</option>
-                  <option value="nombre">Nombre (A - Z)</option>
-                  <option value="precio_asc">Menor precio primero</option>
-                  <option value="precio_desc">Mayor precio primero</option>
-                  <option value="stock_asc">Menor existencia primero</option>
-                  <option value="descuento_desc">Mayor descuento</option>
-                </select>
+                <ErpSelect
+                  value={ordenPor}
+                  onChange={setOrdenPor}
+                  options={[
+                    { value: 'categoria', label: 'Categoría' },
+                    { value: 'nombre', label: 'Nombre (A - Z)' },
+                    { value: 'precio_asc', label: 'Menor precio primero' },
+                    { value: 'precio_desc', label: 'Mayor precio primero' },
+                    { value: 'stock_asc', label: 'Menor existencia primero' },
+                    { value: 'descuento_desc', label: 'Mayor descuento' }
+                  ]}
+                />
               </div>
             </div>
 
@@ -2145,8 +2188,8 @@ export default function CatalogoAdminPage() {
       {tab === 'bajas' && (
         <div className="erp-anim-2">
           <div className="erp-card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260 }}>
-              <div style={{ position: 'relative', flex: 1, maxWidth: 380 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 260, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 220, maxWidth: 380 }}>
                 <input
                   className="erp-input"
                   style={{ paddingLeft: 34 }}
@@ -2159,17 +2202,15 @@ export default function CatalogoAdminPage() {
                 </span>
               </div>
 
-              <div style={{ width: 250 }}>
-                <select
-                  className="erp-select"
+              <div style={{ width: 260 }}>
+                <ErpSelect
                   value={filtroMotivoBaja}
-                  onChange={e => setFiltroMotivoBaja(e.target.value)}
-                >
-                  <option value="todos">Todos los motivos de baja</option>
-                  {MOTIVOS_BAJA.map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
+                  onChange={setFiltroMotivoBaja}
+                  options={[
+                    { value: 'todos', label: 'Todos los motivos de baja' },
+                    ...MOTIVOS_BAJA.map(m => ({ value: m, label: m }))
+                  ]}
+                />
               </div>
             </div>
 
@@ -2253,10 +2294,9 @@ export default function CatalogoAdminPage() {
         </div>
       )}
 
-      {/* ══════════ PESTAÑA 3: BANNERS CON DESPLAZAMIENTO AUTOMÁTICO A LA VISTA PREVIA ══════════ */}
+      {/* ══════════ PESTAÑA 3: BANNERS ══════════ */}
       {tab === 'banners' && (
         <div className="erp-anim-2">
-          {/* SIMULADOR EN VIVO ARRIBA (CON ID PARA SCROLL AUTOMÁTICO) */}
           <div id="simulador-banner-vivo" className="erp-card" style={{ padding: 20, marginBottom: 18, scrollMarginTop: 90 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -2315,10 +2355,6 @@ export default function CatalogoAdminPage() {
                   <div className="erp-banner-config-box">
                     <div className="erp-banner-config-box__title">
                       <span>1. Contenido y Fondo Visual</span>
-                      <label className="link" style={{ fontSize: 11.5, cursor: 'pointer', textTransform: 'none' }}>
-                        {archivoBannerNuevo ? '✓ Imagen cargada' : '+ Subir imagen de fondo'}
-                        <input type="file" accept="image/*" hidden onChange={e => seleccionarFondoBannerLocal(e, null)} />
-                      </label>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 10 }}>
@@ -2336,6 +2372,23 @@ export default function CatalogoAdminPage() {
                       <label className="erp-label">Descripción completa del banner *</label>
                       <input required className="erp-input" placeholder="Mensaje secundario que explica la promoción..." value={nuevoBanner.descripcion_banner} onChange={e => setNuevoBanner({ ...nuevoBanner, descripcion_banner: e.target.value })} />
                     </div>
+
+                    <div>
+                      <label className="erp-label">Imagen de Fondo (Opcional)</label>
+                      <ErpImageUpload
+                        compact
+                        previewUrl={previewBannerNuevo}
+                        title={archivoBannerNuevo ? 'Fondo personalizado listo' : 'Imagen panorámica de fondo'}
+                        subtitle="Arrastra o elige una imagen · Si la dejas vacía usa el degradado corporativo"
+                        buttonLabel={archivoBannerNuevo ? 'Cambiar fondo' : 'Subir fondo'}
+                        onFileSelect={archivo => seleccionarFondoBannerLocal(archivo, null)}
+                        onReset={archivoBannerNuevo ? () => {
+                          setArchivoBannerNuevo(null);
+                          setPreviewBannerNuevo('');
+                        } : null}
+                        resetLabel="Quitar"
+                      />
+                    </div>
                   </div>
 
                   <div className="erp-banner-config-box">
@@ -2345,35 +2398,28 @@ export default function CatalogoAdminPage() {
 
                     <div>
                       <label className="erp-label">Al hacer clic en el banner, llevar a: *</label>
-                      <select
-                        className="erp-select"
+                      <ErpSelect
                         value={nuevoBanner.destino}
-                        onChange={e => setNuevoBanner({ ...nuevoBanner, destino: e.target.value })}
-                      >
-                        {DESTINOS_BANNER.map(d => (
-                          <option key={d.valor} value={d.valor}>{d.etiqueta}</option>
-                        ))}
-                      </select>
+                        onChange={val => setNuevoBanner({ ...nuevoBanner, destino: val })}
+                        searchPlaceholder="Buscar destino, categoría o marca..."
+                        options={OPCIONES_DESTINO_BANNER}
+                      />
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                       <div>
                         <label className="erp-label">Inicia (00:00 hrs)</label>
-                        <input
-                          type="date"
-                          className="erp-input"
+                        <ErpDatePicker
                           value={nuevoBanner.fecha_inicio}
-                          onChange={e => setNuevoBanner({ ...nuevoBanner, fecha_inicio: e.target.value })}
+                          onChange={val => setNuevoBanner({ ...nuevoBanner, fecha_inicio: val })}
                         />
                       </div>
                       <div>
                         <label className="erp-label">Vence (23:59 hrs)</label>
-                        <input
-                          type="date"
-                          min={nuevoBanner.fecha_inicio || hoyStr}
-                          className="erp-input"
+                        <ErpDatePicker
                           value={nuevoBanner.fecha_expiracion}
-                          onChange={e => setNuevoBanner({ ...nuevoBanner, fecha_expiracion: e.target.value })}
+                          min={nuevoBanner.fecha_inicio || hoyStr}
+                          onChange={val => setNuevoBanner({ ...nuevoBanner, fecha_expiracion: val })}
                         />
                       </div>
                     </div>
@@ -2393,7 +2439,7 @@ export default function CatalogoAdminPage() {
             </div>
           </div>
 
-          {/* LISTA DE BANNERS: VISTA RESUMEN LIMPIA + CONFIGURACIÓN DESPLEGABLE */}
+          {/* LISTA DE BANNERS */}
           <div style={{ display: 'grid', gap: 14 }}>
             {banners.map((b, idx) => {
               const { tag: tagActual, desc: descActual, destino: destinoActual } = descomponerLeyendaBanner(
@@ -2499,27 +2545,6 @@ export default function CatalogoAdminPage() {
                           <div className="erp-banner-config-box">
                             <div className="erp-banner-config-box__title">
                               <span>1. Textos y Fondo del Banner</span>
-                              <div style={{ display: 'flex', gap: 10 }}>
-                                <label className="link" style={{ fontSize: 11.5, cursor: 'pointer', textTransform: 'none' }}>
-                                  {tieneCambioSinGuardar ? '✓ Nueva foto lista' : 'Cambiar imagen de fondo'}
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    hidden
-                                    onChange={e => seleccionarFondoBannerLocal(e, b.id_promocion)}
-                                  />
-                                </label>
-                                {tieneImagenPersonalizada && (
-                                  <button
-                                    type="button"
-                                    onClick={() => restaurarColorOriginalBanner(b)}
-                                    className="link"
-                                    style={{ fontSize: 11.5, color: '#C8320A', textTransform: 'none' }}
-                                  >
-                                    Restaurar color original
-                                  </button>
-                                )}
-                              </div>
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 12 }}>
@@ -2530,9 +2555,8 @@ export default function CatalogoAdminPage() {
                                   style={{ fontWeight: 700 }}
                                   value={b.titulo}
                                   onChange={e => {
-                                    const copia = [...banners];
-                                    copia[idx].titulo = e.target.value;
-                                    setBanners(copia);
+                                    const valor = e.target.value;
+                                    setBanners(prev => prev.map((item, i) => (i === idx ? { ...item, titulo: valor } : item)));
                                   }}
                                 />
                               </div>
@@ -2543,9 +2567,14 @@ export default function CatalogoAdminPage() {
                                   className="erp-input"
                                   value={tagActual}
                                   onChange={e => {
-                                    const copia = [...banners];
-                                    copia[idx].leyenda_exclusividad = componerLeyendaBanner(e.target.value, descActual, destinoActual);
-                                    setBanners(copia);
+                                    const valor = e.target.value;
+                                    setBanners(prev =>
+                                      prev.map((item, i) =>
+                                        i === idx
+                                          ? { ...item, leyenda_exclusividad: componerLeyendaBanner(valor, descActual, destinoActual) }
+                                          : item
+                                      )
+                                    );
                                   }}
                                 />
                               </div>
@@ -2557,10 +2586,29 @@ export default function CatalogoAdminPage() {
                                 className="erp-input"
                                 value={descActual}
                                 onChange={e => {
-                                  const copia = [...banners];
-                                  copia[idx].leyenda_exclusividad = componerLeyendaBanner(tagActual, e.target.value, destinoActual);
-                                  setBanners(copia);
+                                  const valor = e.target.value;
+                                  setBanners(prev =>
+                                    prev.map((item, i) =>
+                                      i === idx
+                                        ? { ...item, leyenda_exclusividad: componerLeyendaBanner(tagActual, valor, destinoActual) }
+                                        : item
+                                    )
+                                  );
                                 }}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="erp-label">Fondo Visual del Banner</label>
+                              <ErpImageUpload
+                                compact
+                                previewUrl={tieneImagenPersonalizada ? resolverImagenProducto(urlFondoActiva) : ''}
+                                title={tieneCambioSinGuardar ? 'Nueva imagen de fondo lista' : 'Imagen de fondo personalizada'}
+                                subtitle={tieneImagenPersonalizada ? 'Haz clic o arrastra para reemplazar la imagen actual' : 'Usando color degradado corporativo · Arrastra una foto si deseas cambiarlo'}
+                                buttonLabel="Cambiar fondo"
+                                onFileSelect={archivo => seleccionarFondoBannerLocal(archivo, b.id_promocion)}
+                                onReset={tieneImagenPersonalizada ? () => restaurarColorOriginalBanner(b) : null}
+                                resetLabel="Usar degradado"
                               />
                             </div>
                           </div>
@@ -2572,64 +2620,58 @@ export default function CatalogoAdminPage() {
 
                             <div>
                               <label className="erp-label">Al hacer clic en el banner, dirigir al cliente a:</label>
-                              <select
-                                className="erp-select"
+                              <ErpSelect
                                 value={destinoActual}
-                                onChange={e => {
-                                  const copia = [...banners];
-                                  copia[idx].leyenda_exclusividad = componerLeyendaBanner(tagActual, descActual, e.target.value);
-                                  setBanners(copia);
+                                onChange={val => {
+                                  setBanners(prev =>
+                                    prev.map((item, i) =>
+                                      i === idx
+                                        ? { ...item, leyenda_exclusividad: componerLeyendaBanner(tagActual, descActual, val) }
+                                        : item
+                                    )
+                                  );
                                 }}
-                              >
-                                {DESTINOS_BANNER.map(d => (
-                                  <option key={d.valor} value={d.valor}>{d.etiqueta}</option>
-                                ))}
-                              </select>
+                                searchPlaceholder="Buscar destino, categoría o marca..."
+                                options={OPCIONES_DESTINO_BANNER}
+                              />
                             </div>
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                               <div>
                                 <label className="erp-label">Inicia (00:00)</label>
-                                <input
-                                  type="date"
-                                  className="erp-input"
+                                <ErpDatePicker
                                   value={isoAFechaInput(b.fecha_inicio)}
-                                  onChange={e => {
-                                    const copia = [...banners];
-                                    copia[idx].fecha_inicio = fechaInputAIso(e.target.value, false);
-                                    setBanners(copia);
+                                  onChange={val => {
+                                    const iso = fechaInputAIso(val, false);
+                                    setBanners(prev => prev.map((item, i) => (i === idx ? { ...item, fecha_inicio: iso } : item)));
                                   }}
                                 />
                               </div>
 
                               <div>
                                 <label className="erp-label">Vence (23:59)</label>
-                                <input
-                                  type="date"
-                                  className="erp-input"
+                                <ErpDatePicker
                                   value={isoAFechaInput(b.fecha_expiracion)}
-                                  onChange={e => {
-                                    const copia = [...banners];
-                                    copia[idx].fecha_expiracion = fechaInputAIso(e.target.value, true);
-                                    setBanners(copia);
+                                  min={isoAFechaInput(b.fecha_inicio)}
+                                  onChange={val => {
+                                    const iso = fechaInputAIso(val, true);
+                                    setBanners(prev => prev.map((item, i) => (i === idx ? { ...item, fecha_expiracion: iso } : item)));
                                   }}
                                 />
                               </div>
 
                               <div>
                                 <label className="erp-label">Estado Manual</label>
-                                <select
-                                  className="erp-select"
+                                <ErpSelect
                                   value={b.estado}
-                                  onChange={e => {
-                                    const copia = [...banners];
-                                    copia[idx].estado = e.target.value;
-                                    setBanners(copia);
+                                  onChange={val => {
+                                    setBanners(prev => prev.map((item, i) => (i === idx ? { ...item, estado: val } : item)));
                                   }}
-                                >
-                                  <option value="Activo">Habilitado</option>
-                                  <option value="Inactivo_Expirado">Inhabilitado</option>
-                                </select>
+                                  options={[
+                                    { value: 'Activo', label: 'Habilitado' },
+                                    { value: 'Inactivo_Expirado', label: 'Inhabilitado' }
+                                  ]}
+                                />
                               </div>
                             </div>
                           </div>
@@ -2704,34 +2746,33 @@ export default function CatalogoAdminPage() {
                 </span>
               </div>
 
-              <div style={{ width: 220 }}>
-                <select
-                  className="erp-select"
+              <div style={{ width: 230 }}>
+                <ErpSelect
                   value={filtroTipoAccion}
-                  onChange={e => setFiltroTipoAccion(e.target.value)}
-                >
-                  <option value="todos">Todos los tipos de movimiento</option>
-                  <option value="EDICION_PRECIO_DATOS">Modificaciones y Precios</option>
-                  <option value="DESCUENTO_MASIVO">Descuentos Masivos</option>
-                  <option value="ALTA_PRODUCTO">Altas de Producto</option>
-                  <option value="BAJA_LOGICA">Bajas de Catálogo</option>
-                  <option value="REACTIVACION">Republicaciones</option>
-                  <option value="EDICION_BANNER">Cambios en Banners</option>
-                  <option value="ELIMINACION_BANNER">Banners Eliminados</option>
-                </select>
+                  onChange={setFiltroTipoAccion}
+                  options={[
+                    { value: 'todos', label: 'Todos los tipos de movimiento' },
+                    { value: 'EDICION_PRECIO_DATOS', label: 'Modificaciones y Precios' },
+                    { value: 'DESCUENTO_MASIVO', label: 'Descuentos Masivos' },
+                    { value: 'ALTA_PRODUCTO', label: 'Altas de Producto' },
+                    { value: 'BAJA_LOGICA', label: 'Bajas de Catálogo' },
+                    { value: 'REACTIVACION', label: 'Republicaciones' },
+                    { value: 'EDICION_BANNER', label: 'Cambios en Banners' },
+                    { value: 'ELIMINACION_BANNER', label: 'Banners Eliminados' }
+                  ]}
+                />
               </div>
 
-              <div style={{ width: 210 }}>
-                <select
-                  className="erp-select"
+              <div style={{ width: 220 }}>
+                <ErpSelect
                   value={filtroUsuarioAuditoria}
-                  onChange={e => setFiltroUsuarioAuditoria(e.target.value)}
-                >
-                  <option value="todos">Todos los colaboradores</option>
-                  {usuariosEnBitacora.map(u => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                </select>
+                  onChange={setFiltroUsuarioAuditoria}
+                  searchPlaceholder="Buscar colaborador..."
+                  options={[
+                    { value: 'todos', label: 'Todos los colaboradores' },
+                    ...usuariosEnBitacora.map(u => ({ value: u, label: u }))
+                  ]}
+                />
               </div>
             </div>
 
@@ -2876,27 +2917,13 @@ export default function CatalogoAdminPage() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 18, background: '#F9F8FB', padding: 16, borderRadius: 12, border: '1px solid var(--linea)' }}>
-                <div style={{ width: 88, height: 88, borderRadius: 12, background: '#fff', border: '1px solid var(--linea)', padding: 10, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <img
-                    src={resolverImagenProducto(prodSeleccionado.imagen_url)}
-                    alt=""
-                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                    onError={e => { e.currentTarget.src = '/img/ICONO.png'; }}
-                  />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <b style={{ fontSize: 13.5, display: 'block', marginBottom: 4 }}>Fotografía en Tienda Web</b>
-                  <p style={{ fontSize: 12, color: 'var(--texto-2)', marginBottom: 10 }}>
-                    Formatos recomendados: PNG sin fondo o WEBP.
-                  </p>
-                  <label className="erp-btn erp-btn--secundario" style={{ padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>
-                    <ErpIcon name="plus" size={14} />
-                    <span>Reemplazar fotografía</span>
-                    <input type="file" accept="image/*" hidden onChange={e => subirFotoProducto(e, true)} />
-                  </label>
-                </div>
-              </div>
+              <ErpImageUpload
+                previewUrl={resolverImagenProducto(prodSeleccionado.imagen_url)}
+                title="Fotografía en Tienda Web"
+                subtitle="Arrastra una nueva foto aquí o haz clic · PNG sin fondo o WEBP"
+                buttonLabel="Reemplazar foto"
+                onFileSelect={archivo => subirFotoProducto(archivo, true)}
+              />
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
@@ -2909,30 +2936,24 @@ export default function CatalogoAdminPage() {
                 </div>
                 <div>
                   <label className="erp-label">Categoría</label>
-                  <select
-                    className="erp-select"
-                    value={prodSeleccionado.id_categoria}
-                    onChange={e => setProdSeleccionado({ ...prodSeleccionado, id_categoria: Number(e.target.value) })}
-                  >
-                    {categorias.map(c => (
-                      <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>
-                    ))}
-                  </select>
+                  <ErpSelect
+                    value={String(prodSeleccionado.id_categoria)}
+                    onChange={val => setProdSeleccionado({ ...prodSeleccionado, id_categoria: Number(val) })}
+                    searchPlaceholder="Buscar categoría..."
+                    options={opcionesCatSimples}
+                  />
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label className="erp-label">Marca Comercial</label>
-                  <select
-                    className="erp-select"
+                  <ErpSelect
                     value={prodSeleccionado.marca || 'Dulcerías Candy'}
-                    onChange={e => setProdSeleccionado({ ...prodSeleccionado, marca: e.target.value })}
-                  >
-                    {marcasDisponibles.map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
+                    onChange={val => setProdSeleccionado({ ...prodSeleccionado, marca: val })}
+                    searchPlaceholder="Buscar marca..."
+                    options={opcionesMarcaSimples}
+                  />
                 </div>
                 <div>
                   <label className="erp-label">Presentación</label>
@@ -3032,20 +3053,17 @@ export default function CatalogoAdminPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                       <div>
                         <label className="erp-label">Inicia (00:00 hrs)</label>
-                        <input
-                          type="date"
-                          className="erp-input"
+                        <ErpDatePicker
                           value={prodSeleccionado._fechaInicioInput || ''}
-                          onChange={e => setProdSeleccionado({ ...prodSeleccionado, _fechaInicioInput: e.target.value })}
+                          onChange={val => setProdSeleccionado({ ...prodSeleccionado, _fechaInicioInput: val })}
                         />
                       </div>
                       <div>
                         <label className="erp-label">Termina (23:59 hrs)</label>
-                        <input
-                          type="date"
-                          className="erp-input"
+                        <ErpDatePicker
                           value={prodSeleccionado._fechaFinInput || ''}
-                          onChange={e => setProdSeleccionado({ ...prodSeleccionado, _fechaFinInput: e.target.value })}
+                          min={prodSeleccionado._fechaInicioInput || ''}
+                          onChange={val => setProdSeleccionado({ ...prodSeleccionado, _fechaFinInput: val })}
                         />
                       </div>
                     </div>
@@ -3077,14 +3095,14 @@ export default function CatalogoAdminPage() {
 
               <div>
                 <label className="erp-label">Modalidad de Compra en Tienda Web</label>
-                <select
-                  className="erp-select"
+                <ErpSelect
                   value={prodSeleccionado.es_transaccional ? 'carrito' : 'cotizar'}
-                  onChange={e => setProdSeleccionado({ ...prodSeleccionado, es_transaccional: e.target.value === 'carrito' })}
-                >
-                  <option value="carrito">Venta directa en Carrito de Compras</option>
-                  <option value="cotizar">Bulto / Mayoreo — Solo Cotización por WhatsApp</option>
-                </select>
+                  onChange={val => setProdSeleccionado({ ...prodSeleccionado, es_transaccional: val === 'carrito' })}
+                  options={[
+                    { value: 'carrito', label: 'Venta directa en Carrito de Compras' },
+                    { value: 'cotizar', label: 'Bulto / Mayoreo — Solo Cotización por WhatsApp' }
+                  ]}
+                />
               </div>
 
               {prodSeleccionado.activo !== false && (
@@ -3115,15 +3133,11 @@ export default function CatalogoAdminPage() {
 
                       <div>
                         <label className="erp-label">Motivo de la baja *</label>
-                        <select
-                          className="erp-select"
+                        <ErpSelect
                           value={datosBaja.motivo}
-                          onChange={e => setDatosBaja({ ...datosBaja, motivo: e.target.value })}
-                        >
-                          {MOTIVOS_BAJA.map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
+                          onChange={val => setDatosBaja({ ...datosBaja, motivo: val })}
+                          options={MOTIVOS_BAJA.map(m => ({ value: m, label: m }))}
+                        />
                       </div>
 
                       <div>

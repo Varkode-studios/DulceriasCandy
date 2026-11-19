@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 
 export default function TiendaCandy() {
   const iniciado = useRef(false);
+  const sincronizarRef = useRef(null);
 
   useEffect(() => {
     if (iniciado.current) return;
@@ -918,19 +919,46 @@ export default function TiendaCandy() {
     pintarCatalogo();
     router();
 
+    sincronizarRef.current = sincronizarConSupabase;
     sincronizarConSupabase();
+  }, []);
 
-    // Verificación automática cada 30 segundos por si dan las 00:00 hrs mientras el cliente navega
-    const verificadorVigenciaTimer = setInterval(sincronizarConSupabase, 30000);
+  // Canal Realtime independiente (no se bloquea con React Strict Mode)
+  useEffect(() => {
+    const supabase = createClient();
+
+    const dispararSync = () => {
+      if (sincronizarRef.current) sincronizarRef.current();
+    };
 
     const canalRealtime = supabase
       .channel('cambios-erp-tienda')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tbl_productos' }, () => sincronizarConSupabase())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tbl_promociones_banners' }, () => sincronizarConSupabase())
-      .subscribe();
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tbl_productos' },
+        () => dispararSync()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tbl_promociones_banners' },
+        () => dispararSync()
+      )
+      .subscribe((status) => {
+        console.log('[TiendaCandy Realtime]:', status);
+      });
+
+    // Verificación periódica para cortes automáticos de las 23:59 hrs
+    const verificadorVigenciaTimer = setInterval(dispararSync, 30000);
+
+    // Sincronización inmediata si el usuario cambia de pestaña y regresa a la tienda
+    const alVolverAPestana = () => {
+      if (document.visibilityState === 'visible') dispararSync();
+    };
+    document.addEventListener('visibilitychange', alVolverAPestana);
 
     return () => {
       clearInterval(verificadorVigenciaTimer);
+      document.removeEventListener('visibilitychange', alVolverAPestana);
       supabase.removeChannel(canalRealtime);
     };
   }, []);

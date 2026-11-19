@@ -341,7 +341,7 @@ svg{width:1em;height:1em;fill:currentColor}
 .prod__nom{
   font-size:14px;font-weight:400;line-height:1.4;color:var(--texto);
   margin-bottom:10px;min-height:2.8em;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
 .prod__antes{font-size:12px;color:var(--tenue);text-decoration:line-through}
 .prod__precio{
@@ -2052,7 +2052,7 @@ svg{width:1em;height:1em;fill:currentColor}
   flex-shrink: 0;
 }
 
-/* ══════════ SIMULADOR DE BANNER FIEL A LA TIENDA (IMAGEN DE FONDO COMPLETO) ══════════ */
+/* ══════════ SIMULADOR DE BANNER ══════════ */
 .erp-banner-stage {
   position: relative;
   overflow: hidden;
@@ -2118,7 +2118,7 @@ svg{width:1em;height:1em;fill:currentColor}
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
 }
 
-/* ══════════ TARJETA COMPACTA DE EDICIÓN DE BANNER (SIN ESPACIOS SEPARADOS) ══════════ */
+/* ══════════ TARJETA COMPACTA DE EDICIÓN DE BANNER ══════════ */
 .erp-banner-row {
   background: #fff;
   border: 1.5px solid var(--linea);
@@ -2346,7 +2346,7 @@ svg{width:1em;height:1em;fill:currentColor}
 }
 
 /* ═══════════════════════════════════════════════════════════
-   CATÁLOGO CORPORATIVO DE ALTA DENSIDAD (ESCALABLE A 500+ PRODUCTOS)
+   CATÁLOGO (ESCALABLE A 500+ PRODUCTOS)
    ═══════════════════════════════════════════════════════════ */
 
 .erp-adv-filters {
@@ -2386,7 +2386,7 @@ svg{width:1em;height:1em;fill:currentColor}
   border-color: var(--uva);
 }
 
-/* 1. Estructura Maestro-Detalle para Categorías (Índice lateral + Catálogo) */
+/* 1. Estructura Maestro-Detalle para Categorías */
 .erp-cat-workspace {
   display: grid;
   grid-template-columns: 250px 1fr;
@@ -2460,7 +2460,7 @@ svg{width:1em;height:1em;fill:currentColor}
   color: #fff;
 }
 
-/* 2. Contenedor de Sección de Categoría (Sobrio y Corporativo) */
+/* 2. Contenedor de Sección de Categoría */
 .erp-cat-panel {
   background: #fff;
   border: 1px solid var(--linea);
@@ -2503,7 +2503,7 @@ svg{width:1em;height:1em;fill:currentColor}
   color: var(--texto-2);
 }
 
-/* 3. Grid y Tarjetas Horizontales de Alta Densidad (Para 500 productos) */
+/* 3. Grid y Tarjetas Horizontales (Para 500 productos) */
 .erp-dense-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -2755,7 +2755,7 @@ svg{width:1em;height:1em;fill:currentColor}
 }
 
 /* ═══════════════════════════════════════════════════════════
-   DISEÑO EJECUTIVO DE BANNERS: RESUMEN LIMPIO + EDITOR EN 2 BLOQUES
+   DISEÑO DE BANNERS: RESUMEN + EDITOR EN 2 BLOQUES
    ═══════════════════════════════════════════════════════════ */
 
 .erp-banner-card {
@@ -2870,5 +2870,564 @@ svg{width:1em;height:1em;fill:currentColor}
   }
   .erp-banner-config-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTE ErpSelect (LISTAS DESPLEGABLES DEL ERP)
+   ═══════════════════════════════════════════════════════════ */
+
+.erp-cselect {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #fff;
+  border: 1.5px solid var(--linea, #E6E1EC);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto, #26232B);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  min-height: 40px;
+}
+
+.erp-cselect:hover:not(:disabled) {
+  border-color: #C9BBD8;
+  background: #FDFCFE;
+}
+
+.erp-cselect.abierto,
+.erp-cselect:focus-visible {
+  outline: none;
+  border-color: var(--marca, #EC008C);
+  box-shadow: 0 0 0 3px rgba(236, 0, 140, 0.12);
+}
+
+.erp-cselect:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #F5F3F8;
+}
+
+.erp-cselect--compact {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.erp-cselect__label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erp-cselect__label.placeholder {
+  color: var(--tenue, #8E8799);
+  font-weight: 500;
+}
+
+.erp-cselect__chevron {
+  flex-shrink: 0;
+  color: var(--uva, #3C1053);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.erp-cselect.abierto .erp-cselect__chevron {
+  transform: rotate(180deg);
+  color: var(--marca, #EC008C);
+}
+
+/* Menú flotante con portal (nunca se recorta) */
+.erp-cselect-menu {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1.5px solid #E5DCEB;
+  border-radius: 13px;
+  box-shadow: 0 14px 36px rgba(60, 16, 83, 0.14), 0 4px 12px rgba(20, 8, 32, 0.06);
+  overflow: hidden;
+  animation: erpSelectPop 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.erp-cselect-menu.arriba {
+  transform: translateY(-100%);
+  animation: erpSelectPopUp 0.15s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes erpSelectPop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes erpSelectPopUp {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-100% + 6px)) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-100%) scale(1);
+  }
+}
+
+.erp-cselect-menu__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--linea, #ECE7F2);
+  background: #FAF8FC;
+  color: var(--tenue, #8E8799);
+}
+
+.erp-cselect-menu__search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--texto, #26232B);
+}
+
+.erp-cselect-menu__search input::placeholder {
+  color: var(--tenue, #9B93A8);
+}
+
+.erp-cselect-menu__clear {
+  border: none;
+  background: transparent;
+  color: var(--tenue, #8E8799);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.erp-cselect-menu__clear:hover {
+  color: var(--marca, #EC008C);
+  background: rgba(236, 0, 140, 0.08);
+}
+
+.erp-cselect-menu__list {
+  max-height: 256px;
+  overflow-y: auto;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #D7CCE2 transparent;
+}
+
+.erp-cselect-menu__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.erp-cselect-menu__list::-webkit-scrollbar-thumb {
+  background: #D7CCE2;
+  border-radius: 99px;
+}
+
+.erp-cselect-opt {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--texto, #26232B);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.erp-cselect-opt:hover,
+.erp-cselect-opt.enfocada {
+  background: #F6F0FA;
+  color: var(--uva, #3C1053);
+}
+
+.erp-cselect-opt.seleccionada {
+  background: #FCEBF5;
+  color: var(--marca, #EC008C);
+  font-weight: 700;
+}
+
+.erp-cselect-opt__text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.erp-cselect-opt__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.erp-cselect-opt__badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #F1ECF6;
+  color: var(--uva, #3C1053);
+}
+
+.erp-cselect-opt.seleccionada .erp-cselect-opt__badge {
+  background: rgba(236, 0, 140, 0.14);
+  color: var(--marca, #EC008C);
+}
+
+.erp-cselect-opt__check {
+  color: var(--marca, #EC008C);
+}
+
+.erp-cselect-menu__empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--tenue, #8E8799);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTE ErpDatePicker (CALENDARIO)
+   ═══════════════════════════════════════════════════════════ */
+
+.erp-datepicker-trigger__icon {
+  flex-shrink: 0;
+  color: var(--uva, #3C1053);
+  transition: color 0.18s ease;
+}
+
+.erp-datepicker-trigger.abierto .erp-datepicker-trigger__icon {
+  color: var(--marca, #EC008C);
+}
+
+.erp-datepicker-menu {
+  position: fixed;
+  z-index: 10000;
+  width: 296px;
+  background: #fff;
+  border: 1.5px solid #E5DCEB;
+  border-radius: 15px;
+  padding: 14px;
+  box-shadow: 0 16px 40px rgba(60, 16, 83, 0.16), 0 4px 14px rgba(20, 8, 32, 0.06);
+  animation: erpSelectPop 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.erp-datepicker-menu.arriba {
+  transform: translateY(-100%);
+  animation: erpSelectPopUp 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.erp-datepicker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.erp-datepicker__month {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--uva, #3C1053);
+  letter-spacing: -0.01em;
+}
+
+.erp-datepicker__nav {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--linea, #E6E1EC);
+  background: #FAF8FC;
+  color: var(--uva, #3C1053);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.erp-datepicker__nav:hover {
+  background: #FCEBF5;
+  border-color: rgba(236, 0, 140, 0.35);
+  color: var(--marca, #EC008C);
+}
+
+.erp-datepicker__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.erp-datepicker__weekdays span {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tenue, #8E8799);
+  padding: 4px 0;
+}
+
+.erp-datepicker__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.erp-datepicker__day {
+  height: 34px;
+  border: 1.5px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--texto, #26232B);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.1s ease;
+}
+
+.erp-datepicker__day:hover:not(:disabled) {
+  background: #F6F0FA;
+  color: var(--uva, #3C1053);
+}
+
+.erp-datepicker__day.fuera {
+  color: #C4BCCF;
+  font-weight: 500;
+}
+
+.erp-datepicker__day.hoy {
+  background: #F6F0FA;
+  border-color: rgba(60, 16, 83, 0.25);
+  color: var(--uva, #3C1053);
+  font-weight: 800;
+}
+
+.erp-datepicker__day.seleccionada {
+  background: var(--marca, #EC008C);
+  border-color: var(--marca, #EC008C);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(236, 0, 140, 0.3);
+}
+
+.erp-datepicker__day:disabled {
+  color: #DAD4E2;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.erp-datepicker__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--linea, #ECE7F2);
+}
+
+.erp-datepicker__foot-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.erp-datepicker__foot-btn.borrar {
+  color: var(--texto-2, #6C6578);
+}
+
+.erp-datepicker__foot-btn.borrar:hover {
+  background: #FDECE8;
+  color: #C8320A;
+}
+
+.erp-datepicker__foot-btn.hoy {
+  color: var(--marca, #EC008C);
+  background: #FCEBF5;
+}
+
+.erp-datepicker__foot-btn.hoy:hover:not(:disabled) {
+  background: var(--marca, #EC008C);
+  color: #fff;
+}
+
+.erp-datepicker__foot-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENTE ErpImageUpload (SUBIDA DE IMÁGENES)
+   ═══════════════════════════════════════════════════════════ */
+
+.erp-upload {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #FAF8FC;
+  border: 1.5px dashed #D5C8E3;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.erp-upload:hover,
+.erp-upload:focus-visible {
+  outline: none;
+  border-color: var(--marca, #EC008C);
+  background: #FFF9FC;
+  box-shadow: 0 0 0 3px rgba(236, 0, 140, 0.08);
+}
+
+.erp-upload.arrastrando {
+  border-style: solid;
+  border-color: var(--marca, #EC008C);
+  background: #FCEBF5;
+  box-shadow: 0 0 0 4px rgba(236, 0, 140, 0.14);
+}
+
+.erp-upload--compact {
+  padding: 10px 12px;
+  gap: 12px;
+}
+
+.erp-upload__thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--linea, #E6E1EC);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  color: var(--uva, #3C1053);
+  padding: 6px;
+}
+
+.erp-upload--compact .erp-upload__thumb {
+  width: 48px;
+  height: 48px;
+}
+
+.erp-upload__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-upload__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.erp-upload__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--texto, #26232B);
+  margin-bottom: 2px;
+}
+
+.erp-upload__sub {
+  font-size: 12px;
+  color: var(--texto-2, #6C6578);
+  line-height: 1.35;
+}
+
+.erp-upload__file {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #007A3B;
+  font-weight: 700;
+}
+
+.erp-upload__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.erp-upload__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1.5px solid var(--linea, #E6E1EC);
+  color: var(--uva, #3C1053);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.erp-upload__btn:hover {
+  border-color: var(--marca, #EC008C);
+  color: var(--marca, #EC008C);
+  background: #FFF7FB;
+}
+
+.erp-upload__reset {
+  border: none;
+  background: transparent;
+  color: #C8320A;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.erp-upload__reset:hover {
+  background: #FDECE8;
+}
+
+@media (max-width: 640px) {
+  .erp-upload {
+    flex-wrap: wrap;
+  }
+  .erp-upload__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
