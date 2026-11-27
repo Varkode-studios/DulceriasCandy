@@ -12,7 +12,8 @@ const MODULOS_FIJOS = [
   { href: '/almacen-peps', nombre: 'Almacén 2 Norte', icono: 'box', roles: ['admin', 'almacen_2norte'] },
   { href: '/surtido-picking', nombre: 'Surtido y Corte 4:30', icono: 'clipboard', roles: ['admin', 'almacen_2norte'] },
   { href: '/entrega-qr', nombre: 'Recepción y Entrega QR', icono: 'qrcode', roles: ['admin', 'cajero_sucursal'] },
-  { href: '/crm-cotizaciones', nombre: 'CRM y Garantías 24h', icono: 'users', roles: ['admin', 'asesor_crm'] }
+  { href: '/crm-cotizaciones', nombre: 'CRM y Garantías 24h', icono: 'users', roles: ['admin', 'asesor_crm'] },
+  { href: '/usuarios-admin', nombre: 'Usuarios y Accesos', icono: 'shield', roles: ['admin'] }
 ];
 
 const ETIQUETA_ROL = {
