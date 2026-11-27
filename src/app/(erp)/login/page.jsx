@@ -1,9 +1,17 @@
+// Ruta: src/app/(erp)/login/page.jsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import ErpIcon from '@/components/erp/ErpIcon';
+
+const ROLES_ERP_PERMITIDOS = [
+  'admin',
+  'almacen_2norte',
+  'cajero_sucursal',
+  'asesor_crm'
+];
 
 const CUENTAS_ROLES = [
   {
@@ -12,7 +20,8 @@ const CUENTAS_ROLES = [
     correo: 'admin@dulceriascandy.com',
     icono: 'shield',
     desc: 'Control total de catálogo, inventario PEPS, surtido, entregas QR, CRM y áreas.',
-    codigo: 'ADMIN'
+    codigo: 'ADMIN',
+    modo: 'demo'
   },
   {
     rol: 'almacen_2norte',
@@ -20,7 +29,8 @@ const CUENTAS_ROLES = [
     correo: 'almacen2norte@dulceriascandy.com',
     icono: 'box',
     desc: 'Recepción de lotes con caducidad PEPS y surtido de pedidos con corte 4:30 PM.',
-    codigo: 'ALMACÉN'
+    codigo: 'ALMACÉN',
+    modo: 'demo'
   },
   {
     rol: 'cajero_sucursal',
@@ -28,7 +38,8 @@ const CUENTAS_ROLES = [
     correo: 'caja.centro@dulceriascandy.com',
     icono: 'qrcode',
     desc: 'Recepción de paquetes en sucursal y validación de código QR de entrega.',
-    codigo: 'SUCURSAL'
+    codigo: 'SUCURSAL',
+    modo: 'demo'
   },
   {
     rol: 'asesor_crm',
@@ -36,60 +47,247 @@ const CUENTAS_ROLES = [
     correo: 'crm.mayoreo@dulceriascandy.com',
     icono: 'users',
     desc: 'Cotizaciones mayoristas por WhatsApp y atención de garantías.',
-    codigo: 'CRM'
+    codigo: 'CRM',
+    modo: 'demo'
   }
 ];
 
 export default function LoginErpPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+  const enlaceProcesadoRef = useRef(false);
 
+  // Vistas:
+  // login | recuperar | recuperar_exito | validando_enlace |
+  // nueva_password | password_actualizada | correo_confirmado
   const [vista, setVista] = useState('login');
+  const [esActivacionCuenta, setEsActivacionCuenta] = useState(false);
+
   const [correo, setCorreo] = useState('');
   const [password, setPassword] = useState('');
   const [verPass, setVerPass] = useState(false);
+
+  // Recuperación / Activación
   const [correoRecuperacion, setCorreoRecuperacion] = useState('');
+  const [nuevaPassword, setNuevaPassword] = useState('');
+  const [confirmarPassword, setConfirmarPassword] = useState('');
+  const [verNuevaPass, setVerNuevaPass] = useState(false);
+
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+
+  // Intercepta enlaces de recuperación, activación de cuenta y cambio de correo
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+
+    const code = params.get('code');
+    const modoUrl = params.get('modo'); // 'recuperar' | 'activar' | 'correo_confirmado'
+    const tipoHash = hashParams.get('type'); // 'recovery' | 'invite' | 'signup' | 'email_change'
+    const accessToken = hashParams.get('access_token');
+    const refreshToken = hashParams.get('refresh_token');
+
+    const errorCode = params.get('error_code') || hashParams.get('error_code');
+    const errorDesc = params.get('error_description') || hashParams.get('error_description');
+
+    if (errorCode || errorDesc) {
+      setError(
+        errorCode === 'otp_expired'
+          ? 'El enlace expiró o ya fue utilizado. Solicita uno nuevo.'
+          : 'El enlace de verificación no es válido. Solicita uno nuevo.'
+      );
+      setVista('login');
+      window.history.replaceState({}, '', '/login');
+      return;
+    }
+
+    const esCambioCorreo =
+      modoUrl === 'correo_confirmado' || tipoHash === 'email_change';
+    const esActivacion =
+      modoUrl === 'activar' || tipoHash === 'invite' || tipoHash === 'signup';
+    const esRecuperacion =
+      modoUrl === 'recuperar' || tipoHash === 'recovery';
+
+    const tieneTokenEnUrl = Boolean(code || (accessToken && refreshToken));
+    const esFlujoEspecial = Boolean(
+      esCambioCorreo || esActivacion || esRecuperacion || tieneTokenEnUrl
+    );
+
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setError('');
+        setEsActivacionCuenta(false);
+        setVista('nueva_password');
+        window.history.replaceState({}, '', '/login');
+      } else if (event === 'SIGNED_IN' && session && (esActivacion || esRecuperacion)) {
+        setError('');
+        setEsActivacionCuenta(esActivacion);
+        setVista('nueva_password');
+        window.history.replaceState({}, '', '/login');
+      }
+    });
+
+    async function procesarEnlace() {
+      if (!esFlujoEspecial) return;
+      if (enlaceProcesadoRef.current) return;
+      enlaceProcesadoRef.current = true;
+
+      setVista('validando_enlace');
+
+      // 1. Si llegan tokens en el hash (#access_token=...&refresh_token=...), ej. inviteUserByEmail o email_change
+      if (accessToken && refreshToken) {
+        const { error: setSessErr } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (setSessErr) {
+          setError('El enlace expiró o ya fue utilizado. Solicita uno nuevo.');
+          setVista('login');
+          window.history.replaceState({}, '', '/login');
+          return;
+        }
+
+        if (esCambioCorreo) {
+          localStorage.removeItem('candy_erp_sesion');
+          await supabase.auth.signOut();
+          setError('');
+          setVista('correo_confirmado');
+          window.history.replaceState({}, '', '/login');
+          return;
+        }
+
+        setError('');
+        setEsActivacionCuenta(esActivacion);
+        setVista('nueva_password');
+        window.history.replaceState({}, '', '/login');
+        return;
+      }
+
+      // 2. Si viene confirmación de cambio de correo sin tokens (confirmación directa en servidor)
+      if (esCambioCorreo && !code) {
+        localStorage.removeItem('candy_erp_sesion');
+        await supabase.auth.signOut();
+        setError('');
+        setVista('correo_confirmado');
+        window.history.replaceState({}, '', '/login');
+        return;
+      }
+
+      // 3. Flujo PKCE (?code=...)
+      let {
+        data: { session }
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+        ({
+          data: { session }
+        } = await supabase.auth.getSession());
+      }
+
+      if (!session && code) {
+        const { data, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+        if (!exchangeErr && data?.session) {
+          session = data.session;
+        } else {
+          ({
+            data: { session }
+          } = await supabase.auth.getSession());
+        }
+      }
+
+      if (esCambioCorreo) {
+        localStorage.removeItem('candy_erp_sesion');
+        await supabase.auth.signOut();
+        setError('');
+        setVista('correo_confirmado');
+        window.history.replaceState({}, '', '/login');
+        return;
+      }
+
+      if (session) {
+        setError('');
+        setEsActivacionCuenta(esActivacion);
+        setVista('nueva_password');
+        window.history.replaceState({}, '', '/login');
+        return;
+      }
+
+      setError(
+        'El enlace expiró, ya fue utilizado o se abrió en otro navegador. Solicita uno nuevo.'
+      );
+      setVista('login');
+      window.history.replaceState({}, '', '/login');
+    }
+
+    procesarEnlace();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   async function iniciarConFormulario(e) {
     e.preventDefault();
     setError('');
     setCargando(true);
 
-    const cuentaDemo = CUENTAS_ROLES.find(c => c.correo.toLowerCase() === correo.trim().toLowerCase());
+    const correoLimpio = correo.trim().toLowerCase();
+
+    const cuentaDemo = CUENTAS_ROLES.find(c => c.correo.toLowerCase() === correoLimpio);
     if (cuentaDemo && password.length >= 4) {
       entrarConPerfil(cuentaDemo);
       return;
     }
 
     const { data, error: authErr } = await supabase.auth.signInWithPassword({
-      email: correo,
+      email: correoLimpio,
       password
     });
 
     if (authErr || !data?.user) {
-      setError('Credenciales inválidas o cuenta no autorizada en el Nodo Central 2 Norte.');
+      const msg = String(authErr?.message || '').toLowerCase();
+      if (msg.includes('email not confirmed')) {
+        setError('Tu cuenta aún no ha sido activada. Revisa tu correo electrónico y haz clic en el enlace de activación.');
+      } else if (msg.includes('banned')) {
+        setError('Tu cuenta se encuentra inactiva o dada de baja. Contacta al Administrador de SIGE Candy.');
+      } else {
+        setError('Credenciales inválidas o cuenta no autorizada en el Nodo Central 2 Norte.');
+      }
       setCargando(false);
       return;
     }
 
-    const { data: perfil } = await supabase
+    const { data: perfil, error: perfilErr } = await supabase
       .from('tbl_perfiles_usuarios')
-      .select('*')
+      .select('id_usuario, nombre_completo, email, rol, sucursal_asignada, activo')
       .eq('id_usuario', data.user.id)
       .single();
 
-    if (perfil && perfil.rol === 'cliente') {
-      setError('Acceso denegado: Esta cuenta pertenece al portal de clientes.');
+    if (perfilErr || !perfil || !ROLES_ERP_PERMITIDOS.includes(perfil.rol)) {
+      await supabase.auth.signOut();
+      setError('Acceso denegado: Esta cuenta no tiene permisos de colaborador de SIGE Candy.');
+      setCargando(false);
+      return;
+    }
+
+    if (perfil.activo === false) {
+      await supabase.auth.signOut();
+      setError('Tu cuenta ha sido dada de baja. Contacta a Dirección / Administración.');
       setCargando(false);
       return;
     }
 
     entrarConPerfil({
-      rol: perfil?.rol || 'admin',
-      nombre: perfil?.nombre_completo || data.user.email,
-      correo: data.user.email
+      id_usuario: perfil.id_usuario,
+      rol: perfil.rol,
+      nombre: perfil.nombre_completo || data.user.email,
+      correo: perfil.email || data.user.email,
+      sucursal_asignada: perfil.sucursal_asignada || null,
+      modo: 'auth'
     });
   }
 
@@ -98,16 +296,66 @@ export default function LoginErpPage() {
     setError('');
     setCargando(true);
 
-    try {
-      await supabase.auth.resetPasswordForEmail(correoRecuperacion.trim(), {
-        redirectTo: `${window.location.origin}/login`
-      });
-    } catch (_) {}
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+      correoRecuperacion.trim().toLowerCase(),
+      {
+        redirectTo: `${window.location.origin}/login?modo=recuperar`
+      }
+    );
 
-    setTimeout(() => {
+    setCargando(false);
+
+    if (resetErr) {
+      const msg = String(resetErr.message || '').toLowerCase();
+      if (msg.includes('rate limit') || resetErr.status === 429) {
+        setError('Demasiados intentos seguidos. Espera 60 segundos antes de solicitar otro correo.');
+      } else {
+        setError(resetErr.message || 'No se pudo enviar el correo de recuperación.');
+      }
+      return;
+    }
+
+    setVista('recuperar_exito');
+  }
+
+  async function guardarNuevaPassword(e) {
+    e.preventDefault();
+    setError('');
+
+    if (nuevaPassword.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    if (nuevaPassword !== confirmarPassword) {
+      setError('Las contraseñas no coinciden. Verifica ambos campos.');
+      return;
+    }
+
+    setCargando(true);
+
+    const { error: updateErr } = await supabase.auth.updateUser({
+      password: nuevaPassword
+    });
+
+    if (updateErr) {
+      const msg = String(updateErr.message || '').toLowerCase();
+      if (msg.includes('different from the old')) {
+        setError('La nueva contraseña debe ser distinta a la que tenías anteriormente.');
+      } else {
+        setError(updateErr.message || 'No se pudo guardar la contraseña.');
+      }
       setCargando(false);
-      setVista('recuperar_exito');
-    }, 500);
+      return;
+    }
+
+    localStorage.removeItem('candy_erp_sesion');
+    await supabase.auth.signOut();
+
+    setNuevaPassword('');
+    setConfirmarPassword('');
+    setCargando(false);
+    setVista('password_actualizada');
   }
 
   function entrarConPerfil(perfil) {
@@ -149,11 +397,11 @@ export default function LoginErpPage() {
                 style={{ height: 42 }}
                 onError={e => { e.currentTarget.src = '/img/ICONO.png'; }}
               />
-              <span className="erp-sidebar__tag">Acceso Corporativo</span>
+              <span className="erp-sidebar__tag">SIGE Candy</span>
             </div>
 
             <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 6 }}>
-              Sistema de Planificación de Recursos (Mini-ERP)
+              Sistema Integral de Gestión Empresarial (SIGE Candy)
             </h2>
             <p style={{ fontSize: 13, color: 'rgba(237, 231, 242, 0.72)', lineHeight: 1.55, marginBottom: 24 }}>
               Plataforma centralizada para control de inventario PEPS, sincronización comercial en tiempo real y logística Click & Collect.
@@ -206,7 +454,7 @@ export default function LoginErpPage() {
           </div>
         </div>
 
-        {/* PANEL DERECHO: FORMULARIO DE AUTENTICACIÓN Y RECUPERACIÓN */}
+        {/* PANEL DERECHO: FORMULARIOS */}
         <div style={{ padding: '42px 38px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           {vista === 'login' && (
             <div key="login-form" className="erp-anim-1">
@@ -219,7 +467,7 @@ export default function LoginErpPage() {
                   Iniciar sesión
                 </h1>
                 <p style={{ fontSize: 13.5, color: 'var(--texto-2)', marginTop: 4 }}>
-                  Ingresa tus credenciales de colaborador para acceder a tus módulos asignados.
+                  Ingresa tus credenciales de colaborador para acceder a SIGE Candy.
                 </p>
               </div>
 
@@ -300,7 +548,7 @@ export default function LoginErpPage() {
                 </div>
 
                 <button type="submit" disabled={cargando} className="erp-btn erp-btn--primario" style={{ width: '100%', padding: '11px 18px', marginTop: 4 }}>
-                  <span>{cargando ? 'Validando credenciales...' : 'Acceder al Sistema ERP'}</span>
+                  <span>{cargando ? 'Validando credenciales...' : 'Acceder a SIGE Candy'}</span>
                   <ErpIcon name="arrow-right" size={16} />
                 </button>
               </form>
@@ -317,8 +565,15 @@ export default function LoginErpPage() {
                 ¿Olvidaste tu contraseña?
               </h1>
               <p style={{ fontSize: 13, color: 'var(--texto-2)', marginBottom: 20, lineHeight: 1.55 }}>
-                Ingresa tu correo corporativo registrado en Dulcerías Candy para enviarte las instrucciones de restablecimiento y notificar al administrador del sistema.
+                Ingresa tu correo registrado en SIGE Candy para enviarte el enlace seguro de restablecimiento. Abre el enlace en este mismo navegador.
               </p>
+
+              {error && (
+                <div style={{ background: '#FDECE8', border: '1px solid #F7C5B8', color: '#C8320A', padding: '10px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ErpIcon name="alert" size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
 
               <form onSubmit={enviarRecuperacionPassword} style={{ display: 'grid', gap: 15 }}>
                 <div>
@@ -335,12 +590,15 @@ export default function LoginErpPage() {
 
                 <button type="submit" disabled={cargando} className="erp-btn erp-btn--primario" style={{ width: '100%' }}>
                   <ErpIcon name="mail" size={16} />
-                  <span>{cargando ? 'Procesando solicitud...' : 'Enviar enlace de recuperación'}</span>
+                  <span>{cargando ? 'Enviando enlace...' : 'Enviar enlace de recuperación'}</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setVista('login')}
+                  onClick={() => {
+                    setError('');
+                    setVista('login');
+                  }}
                   className="erp-btn erp-btn--secundario"
                   style={{ width: '100%' }}
                 >
@@ -356,9 +614,9 @@ export default function LoginErpPage() {
               <div style={{ width: 52, height: 52, borderRadius: 12, background: '#E8F7EF', color: '#007A3B', display: 'grid', placeItems: 'center', margin: '0 auto 14px', border: '1px solid #BFEAD2' }}>
                 <ErpIcon name="check" size={24} />
               </div>
-              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Solicitud registrada</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Correo enviado</h2>
               <p style={{ fontSize: 13, color: 'var(--texto-2)', lineHeight: 1.6, marginBottom: 20 }}>
-                Se envió el enlace de restablecimiento a <b>{correoRecuperacion}</b> y se notificó a la administración de TI del Nodo 2 Norte.
+                Si <b>{correoRecuperacion}</b> está registrado, recibirás un correo de <b>Dulcerías Candy</b> con el enlace para crear una nueva contraseña.
               </p>
               <button
                 type="button"
@@ -366,7 +624,162 @@ export default function LoginErpPage() {
                 className="erp-btn erp-btn--primario"
                 style={{ width: '100%' }}
               >
-                Regresar al acceso principal
+                Regresar al inicio de sesión
+              </button>
+            </div>
+          )}
+
+          {vista === 'validando_enlace' && (
+            <div key="validando-link" className="erp-anim-1" style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(59, 13, 84, 0.1)', color: 'var(--uva)', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>
+                <ErpIcon name="lock" size={22} />
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Validando enlace seguro...</h2>
+              <p style={{ fontSize: 13, color: 'var(--texto-2)' }}>
+                Verificando tu correo con los servidores de SIGE Candy.
+              </p>
+            </div>
+          )}
+
+          {vista === 'nueva_password' && (
+            <div key="nueva-password-form" className="erp-anim-1">
+              <span className="erp-badge erp-badge--verde" style={{ marginBottom: 10 }}>
+                <ErpIcon name="shield" size={13} />
+                <span>{esActivacionCuenta ? 'Correo verificado · Activación' : 'Enlace verificado'}</span>
+              </span>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--texto)', marginBottom: 6 }}>
+                {esActivacionCuenta ? 'Activa tu cuenta en SIGE Candy' : 'Crear nueva contraseña'}
+              </h1>
+              <p style={{ fontSize: 13, color: 'var(--texto-2)', marginBottom: 20, lineHeight: 1.55 }}>
+                {esActivacionCuenta
+                  ? 'Tu correo ya fue confirmado. Define tu contraseña personal para empezar a usar SIGE Candy (mínimo 6 caracteres).'
+                  : 'Ingresa y confirma tu nueva contraseña de acceso a SIGE Candy (mínimo 6 caracteres).'}
+              </p>
+
+              {error && (
+                <div style={{ background: '#FDECE8', border: '1px solid #F7C5B8', color: '#C8320A', padding: '10px 12px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ErpIcon name="alert" size={16} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <form onSubmit={guardarNuevaPassword} style={{ display: 'grid', gap: 15 }}>
+                <div>
+                  <label className="erp-label">Nueva contraseña *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={verNuevaPass ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      className="erp-input"
+                      style={{ paddingLeft: 36, paddingRight: 38 }}
+                      placeholder="Mínimo 6 caracteres"
+                      value={nuevaPassword}
+                      onChange={e => setNuevaPassword(e.target.value)}
+                    />
+                    <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--tenue)' }}>
+                      <ErpIcon name="lock" size={16} />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setVerNuevaPass(!verNuevaPass)}
+                      aria-label="Mostrar u ocultar contraseña"
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        border: 'none',
+                        background: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--texto-2)'
+                      }}
+                    >
+                      <ErpIcon name={verNuevaPass ? 'eye-off' : 'eye'} size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="erp-label">Confirmar contraseña *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={verNuevaPass ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      className="erp-input"
+                      style={{ paddingLeft: 36 }}
+                      placeholder="Repite tu contraseña"
+                      value={confirmarPassword}
+                      onChange={e => setConfirmarPassword(e.target.value)}
+                    />
+                    <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--tenue)' }}>
+                      <ErpIcon name="lock" size={16} />
+                    </span>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={cargando} className="erp-btn erp-btn--primario" style={{ width: '100%' }}>
+                  <ErpIcon name="check" size={16} />
+                  <span>
+                    {cargando
+                      ? 'Guardando...'
+                      : esActivacionCuenta
+                      ? 'Activar cuenta y guardar contraseña'
+                      : 'Guardar nueva contraseña'}
+                  </span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {vista === 'password_actualizada' && (
+            <div key="pass-ok" className="erp-anim-1" style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: '#E8F7EF', color: '#007A3B', display: 'grid', placeItems: 'center', margin: '0 auto 14px', border: '1px solid #BFEAD2' }}>
+                <ErpIcon name="check" size={24} />
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
+                {esActivacionCuenta ? '¡Cuenta activada!' : '¡Contraseña actualizada!'}
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--texto-2)', lineHeight: 1.6, marginBottom: 20 }}>
+                {esActivacionCuenta
+                  ? 'Tu correo quedó validado y tu contraseña está lista. Ya puedes iniciar sesión en SIGE Candy.'
+                  : 'Tu contraseña se guardó correctamente. Ya puedes ingresar a SIGE Candy con tus nuevas credenciales.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setEsActivacionCuenta(false);
+                  setVista('login');
+                }}
+                className="erp-btn erp-btn--primario"
+                style={{ width: '100%' }}
+              >
+                Iniciar sesión ahora
+              </button>
+            </div>
+          )}
+
+          {vista === 'correo_confirmado' && (
+            <div key="email-ok" className="erp-anim-1" style={{ textAlign: 'center', padding: '12px 0' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: '#E8F7EF', color: '#007A3B', display: 'grid', placeItems: 'center', margin: '0 auto 14px', border: '1px solid #BFEAD2' }}>
+                <ErpIcon name="mail" size={24} />
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>¡Nuevo correo confirmado!</h2>
+              <p style={{ fontSize: 13, color: 'var(--texto-2)', lineHeight: 1.6, marginBottom: 20 }}>
+                Tu dirección de correo electrónico ha sido validada y actualizada en SIGE Candy. Inicia sesión usando tu nuevo correo.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setError('');
+                  setVista('login');
+                }}
+                className="erp-btn erp-btn--primario"
+                style={{ width: '100%' }}
+              >
+                Ir a iniciar sesión
               </button>
             </div>
           )}
