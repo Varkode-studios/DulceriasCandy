@@ -79,14 +79,14 @@ export default function TiendaCandy() {
       {id:'enc-07',nombre:'Rielitos de tamarindo',marca:'Vero',unidad:'Caja 24 piezas',precio:78,cat:'enchilados',piezas:24,stock:30,tope:20,desc:'Tiras de tamarindo con chile en presentación individual.'},
       {id:'enc-08',nombre:'Cueritos enchilados',marca:'Anáhuac',unidad:'Bolsa 500 g',precio:64,cat:'enchilados',piezas:70,stock:30,tope:20,desc:'Gomita salada y picosa. La botana de dulcería por excelencia.'},
       {id:'fie-01',nombre:'Surtido piñatero armado',marca:'Dulcerías Candy',unidad:'Paquete 3 kg',precio:250,antes:290,cat:'fiesta',etiqueta:'top',piezas:0,stock:25,tope:10,desc:'Mezcla lista para rellenar piñata: gomitas, paletas, caramelos y enchilados.'},
-      {id:'fie-02',nombre:'Globos metálicos surtidos',marca:'Dulcerías Candy',unidad:'Paquete 12 piezas',precio:80,cat:'fiesta',etiqueta:'nuevo',piezas:0,stock:30,tope:20,desc:'Colores metálicos surtidos. Combínalos con el color de tu evento.'},
-      {id:'fie-03',nombre:'Velas mágicas de chispas',marca:'Dulcerías Candy',unidad:'Paquete 10 piezas',precio:40,cat:'fiesta',piezas:0,stock:40,tope:20,desc:'Las que no se apagan al soplar. Para el momento del pastel.'},
+      {id:'fie-02',nombre:'Globos metálicos surtidos',marca:'',unidad:'Paquete 12 piezas',precio:80,cat:'fiesta',etiqueta:'nuevo',piezas:0,stock:30,tope:20,desc:'Colores metálicos surtidos. Combínalos con el color de tu evento.'},
+      {id:'fie-03',nombre:'Velas mágicas de chispas',marca:'',unidad:'Paquete 10 piezas',precio:40,cat:'fiesta',piezas:0,stock:40,tope:20,desc:'Las que no se apagan al soplar. Para el momento del pastel.'},
       {id:'fie-04',nombre:'Bolsitas de dulces armadas',marca:'Dulcerías Candy',unidad:'10 bolsitas',precio:150,cat:'fiesta',piezas:0,stock:20,tope:20,desc:'Ya preparadas y selladas. Nos dices cuántos invitados y las dejamos listas.'},
-      {id:'fie-05',nombre:'Piñata de estrella mediana',marca:'Dulcerías Candy',unidad:'1 pieza',precio:180,cat:'fiesta',piezas:0,stock:15,tope:10,desc:'Piñata tradicional de papel. Aguanta bien y se ve grande en la foto.'},
-      {id:'fie-06',nombre:'Bolsitas de celofán decoradas',marca:'Dulcerías Candy',unidad:'Paquete 25 piezas',precio:45,cat:'fiesta',piezas:25,stock:35,tope:20,desc:'Vacías, para que tú armes el surtido. Con listones de colores incluidos.'},
-      {id:'fie-07',nombre:'Serpentinas y confeti',marca:'Dulcerías Candy',unidad:'Paquete 12 piezas',precio:55,cat:'fiesta',piezas:0,stock:30,tope:20,desc:'Para el momento de la foto. Colores surtidos.'},
-      {id:'fie-08',nombre:'Platos y vasos temáticos',marca:'Dulcerías Candy',unidad:'Paquete 25 juegos',precio:120,cat:'fiesta',piezas:0,stock:25,tope:20,desc:'Desechables a juego. Varios diseños disponibles en tienda.'},
-      {id:'fie-09',nombre:'Piñata de personaje grande',marca:'Dulcerías Candy',unidad:'1 pieza',precio:320,antes:365,cat:'fiesta',piezas:0,stock:10,tope:5,desc:'Piñata grande de papel. Pregunta por diseños disponibles.'}
+      {id:'fie-05',nombre:'Piñata de estrella mediana',marca:'',unidad:'1 pieza',precio:180,cat:'fiesta',piezas:0,stock:15,tope:10,desc:'Piñata tradicional de papel. Aguanta bien y se ve grande en la foto.'},
+      {id:'fie-06',nombre:'Bolsitas de celofán decoradas',marca:'',unidad:'Paquete 25 piezas',precio:45,cat:'fiesta',piezas:25,stock:35,tope:20,desc:'Vacías, para que tú armes el surtido. Con listones de colores incluidos.'},
+      {id:'fie-07',nombre:'Serpentinas y confeti',marca:'',unidad:'Paquete 12 piezas',precio:55,cat:'fiesta',piezas:0,stock:30,tope:20,desc:'Para el momento de la foto. Colores surtidos.'},
+      {id:'fie-08',nombre:'Platos y vasos temáticos',marca:'',unidad:'Paquete 25 juegos',precio:120,cat:'fiesta',piezas:0,stock:25,tope:20,desc:'Desechables a juego. Varios diseños disponibles en tienda.'},
+      {id:'fie-09',nombre:'Piñata de personaje grande',marca:'',unidad:'1 pieza',precio:320,antes:365,cat:'fiesta',piezas:0,stock:10,tope:5,desc:'Piñata grande de papel. Pregunta por diseños disponibles.'}
     ];
 
     let PRODUCTOS = [...PRODUCTOS_BASE];
@@ -553,7 +553,8 @@ export default function TiendaCandy() {
         const dest = btnBanner.dataset.bannerDestino || '#catalogo';
         location.hash = '#/';
 
-        if (dest === '#pinata') {
+        if (dest === '#pinata' || dest === '#aguinaldos') {
+          cambiarModo(dest === '#aguinaldos' ? 'bolsa' : 'pinata');
           setTimeout(() => document.getElementById('pinata')?.scrollIntoView({ behavior: 'smooth' }), 60);
           return;
         }
@@ -1796,19 +1797,21 @@ export default function TiendaCandy() {
 
       if (prodsDB && prodsDB.length > 0) {
         const catalogoReconstruido = PRODUCTOS_BASE.map(item => ({ ...item }));
-        const idsDadosDeBaja = new Set();
-        const nombresDadosDeBaja = new Set();
+        const idsOcultosWeb = new Set();
+        const nombresOcultosWeb = new Set();
 
         prodsDB.forEach(db => {
           const idProd = db.codigo_barras || String(db.id_producto);
           const nombreNorm = (db.nombre_dulce || '').trim().toLowerCase();
 
-          if (db.activo === false) {
-            idsDadosDeBaja.add(idProd);
-            if (nombreNorm) nombresDadosDeBaja.add(nombreNorm);
+          // Ocultar en la tienda web si está dado de baja o en modo Borrador (Solo SIGE Candy)
+          if (db.activo === false || db.publicado_web === false) {
+            idsOcultosWeb.add(idProd);
+            if (nombreNorm) nombresOcultosWeb.add(nombreNorm);
             return;
           }
 
+          // Validar vigencia automática del descuento (corte 23:59)
           let descPct = Number(db.porcentaje_descuento || 0);
           if (descPct > 0) {
             const inicio = db.descuento_inicio ? new Date(db.descuento_inicio) : null;
@@ -1829,17 +1832,27 @@ export default function TiendaCandy() {
           );
           const piezasBase = idx >= 0 ? catalogoReconstruido[idx].piezas : 0;
 
+          const marcaLimpia =
+            db.marca && db.marca !== 'Sin marca / Genérico'
+              ? db.marca
+              : '';
+
+          const etiquetaReal =
+            db.etiqueta_web && db.etiqueta_web !== 'normal'
+              ? db.etiqueta_web
+              : null;
+
           const itemMapeado = {
             id_db: db.id_producto,
             id: idProd,
             nombre: db.nombre_dulce,
-            marca: db.marca || 'Dulcerías Candy',
+            marca: marcaLimpia,
             unidad: db.presentacion || 'Pieza',
             precio: precioConDescuento,
             antes: precioAntes,
             descuentoPct: descPct,
             cat: db.tbl_categorias?.slug || 'gomitas',
-            etiqueta: descPct > 0 ? 'top' : 'nuevo',
+            etiqueta: etiquetaReal,
             piezas: Number(db.piezas_por_paquete) > 0 ? Number(db.piezas_por_paquete) : piezasBase,
             stock: db.stock_web,
             tope: db.tope_maximo_compra || 20,
@@ -1860,7 +1873,7 @@ export default function TiendaCandy() {
         });
 
         PRODUCTOS = catalogoReconstruido.filter(
-          p => !idsDadosDeBaja.has(String(p.id)) && !nombresDadosDeBaja.has(p.nombre.toLowerCase())
+          p => !idsOcultosWeb.has(String(p.id)) && !nombresOcultosWeb.has(p.nombre.toLowerCase())
         );
       }
 
@@ -2450,7 +2463,7 @@ export default function TiendaCandy() {
         <p className="pie__legal">
           © 2026 Dulcerías Candy · Puebla, México · Hecho con mucha azúcar ·{' '}
           <a href="/login" style={{ color: '#FEDD00', fontWeight: 700, marginLeft: 8 }}>
-            🔒 Acceso Personal (ERP)
+            🔒 Acceso Personal (SIGE Candy)
           </a>
         </p>
       </footer>

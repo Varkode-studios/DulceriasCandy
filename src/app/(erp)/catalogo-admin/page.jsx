@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import ErpIcon from '@/components/erp/ErpIcon';
 import ErpSelect from '@/components/erp/ErpSelect';
 import ErpDatePicker from '@/components/erp/ErpDatePicker';
 import ErpImageUpload from '@/components/erp/ErpImageUpload';
+import ErpImportarExcel from '@/components/erp/ErpImportarExcel';
 
 const FONDOS_ORIGINALES = [
   'linear-gradient(125deg, #EC008C 0%, #C6007E 55%, #7A1E86 100%)',
@@ -13,46 +14,44 @@ const FONDOS_ORIGINALES = [
   'linear-gradient(125deg, #F7941D 0%, #EC008C 60%, #3C1053 100%)'
 ];
 
+const SIN_MARCA = 'Sin marca / Genérico';
+
 const MARCAS_DISPONIBLES_BASE = [
-  'Ricolino',
-  'De la Rosa',
-  'Vero',
-  "Hershey's",
-  'Ferrero',
+  'Alteño',
+  'Anáhuac',
+  'Arcor',
+  'Barcel',
+  'Betamex',
   "Canel's",
   'Chupa Chups',
-  'Anáhuac',
-  'La Poblana',
+  'Cooltoons',
+  'Cuétara',
+  'De la Rosa',
+  'Dulcerías Candy',
+  'Ferrero',
+  'Gamesa',
+  'Gapsa',
+  "Hershey's",
+  'Kalú',
+  'Kipi',
+  'La Botanera',
   'La Perla',
-  'Dulcerías Candy'
+  'La Poblana',
+  "Mac'ma",
+  'Marinela',
+  'Mars',
+  'Ricolino',
+  'Sabritas',
+  'Salsa Valentina',
+  'Tutsi Pop',
+  'Vero'
 ];
 
-const DESTINOS_BANNER = [
-  { valor: '#oferta', etiqueta: 'Promoción: Productos con descuento activo (Buen Fin / Ofertas)' },
-  { valor: '#catalogo', etiqueta: 'Catálogo completo (Todos los productos)' },
-  { valor: '#pinata', etiqueta: 'Sección: Armador de Piñata interactivo' },
-  { valor: '#cat:gomitas', etiqueta: 'Categoría: Gomitas' },
-  { valor: '#cat:chocolates', etiqueta: 'Categoría: Chocolates' },
-  { valor: '#cat:caramelos', etiqueta: 'Categoría: Caramelos' },
-  { valor: '#cat:paletas', etiqueta: 'Categoría: Paletas' },
-  { valor: '#cat:enchilados', etiqueta: 'Categoría: Enchilados' },
-  { valor: '#cat:fiesta', etiqueta: 'Categoría: Fiesta y Piñatería' },
-  { valor: '#marca:Ricolino', etiqueta: 'Marca: Ricolino' },
-  { valor: '#marca:De la Rosa', etiqueta: 'Marca: De la Rosa' },
-  { valor: '#marca:Vero', etiqueta: 'Marca: Vero' },
-  { valor: "#marca:Hershey's", etiqueta: "Marca: Hershey's" },
-  { valor: '#marca:Ferrero', etiqueta: 'Marca: Ferrero' },
-  { valor: "#marca:Canel's", etiqueta: "Marca: Canel's" },
-  { valor: '#marca:Chupa Chups', etiqueta: 'Marca: Chupa Chups' },
-  { valor: '#marca:Anáhuac', etiqueta: 'Marca: Anáhuac' },
-  { valor: '#marca:La Poblana', etiqueta: 'Marca: La Poblana' },
-  { valor: '#marca:La Perla', etiqueta: 'Marca: La Perla' }
+const OPCIONES_ETIQUETA_WEB = [
+  { value: 'normal', label: 'Estándar (Sin etiqueta especial)' },
+  { value: 'nuevo', label: 'Novedad (Sello "Nuevo" y filtro Novedades)' },
+  { value: 'top', label: 'Más vendido (Estante principal)' }
 ];
-
-const OPCIONES_DESTINO_BANNER = DESTINOS_BANNER.map(d => ({
-  value: d.valor,
-  label: d.etiqueta
-}));
 
 const MOTIVOS_BAJA = [
   'Fin de temporada',
@@ -67,6 +66,8 @@ const ETIQUETA_TIPO_ACCION = {
   ALTA_PRODUCTO: { texto: 'Alta de Producto', clase: 'erp-badge--verde' },
   EDICION_PRECIO_DATOS: { texto: 'Modificación / Precio', clase: 'erp-badge--uva' },
   DESCUENTO_MASIVO: { texto: 'Descuento Masivo', clase: 'erp-badge--marca' },
+  IMPORTACION_EXCEL: { texto: 'Importación Excel', clase: 'erp-badge--verde' },
+  VISIBILIDAD_WEB: { texto: 'Visibilidad Web', clase: 'erp-badge--amarillo' },
   BAJA_LOGICA: { texto: 'Baja de Catálogo', clase: 'erp-badge--naranja' },
   REACTIVACION: { texto: 'Republicación', clase: 'erp-badge--verde' },
   EDICION_BANNER: { texto: 'Banner Portada', clase: 'erp-badge--amarillo' },
@@ -74,6 +75,19 @@ const ETIQUETA_TIPO_ACCION = {
 };
 
 const PORCENTAJES_RAPIDOS = [0, 5, 10, 15, 20, 25, 30, 50];
+
+function normalizarMarca(valor) {
+  const m = String(valor || '').trim();
+  if (!m || m === SIN_MARCA) {
+    return SIN_MARCA;
+  }
+  return m;
+}
+
+function marcaParaDB(valor) {
+  const m = normalizarMarca(valor);
+  return m === SIN_MARCA ? null : m;
+}
 
 function descomponerLeyendaBanner(leyenda = '', urlImg = '') {
   const partes = String(leyenda || '').split('|').map(s => s.trim());
@@ -222,7 +236,7 @@ export default function CatalogoAdminPage() {
   const [filtroTipoAccion, setFiltroTipoAccion] = useState('todos');
   const [filtroUsuarioAuditoria, setFiltroUsuarioAuditoria] = useState('todos');
 
-  // Paneles desplegables superiores
+  // Paneles desplegables superiores ('descuentos_masivos' | 'alta_producto' | 'importar_excel' | null)
   const [panelAbierto, setPanelAbierto] = useState(null);
   const [mostrarFormBanner, setMostrarFormBanner] = useState(false);
   const [bannerEditandoId, setBannerEditandoId] = useState(null);
@@ -238,6 +252,7 @@ export default function CatalogoAdminPage() {
     fecha_fin: ''
   });
   const [aplicandoDescuento, setAplicandoDescuento] = useState(false);
+  const [publicandoMasivo, setPublicandoMasivo] = useState(false);
 
   // Inspector lateral de producto
   const [prodSeleccionado, setProdSeleccionado] = useState(null);
@@ -258,6 +273,8 @@ export default function CatalogoAdminPage() {
     id_categoria: 1,
     marca: 'Ricolino',
     presentacion: 'Bolsa 1 kg',
+    piezas_por_paquete: 0,
+    etiqueta_web: 'normal',
     precio_unitario: '',
     porcentaje_descuento: 0,
     descuento_inicio: '',
@@ -265,6 +282,7 @@ export default function CatalogoAdminPage() {
     tope_maximo_compra: 20,
     stock_web: 25,
     es_transaccional: true,
+    publicado_web: true,
     imagen_url: 'img/Gomita.png'
   });
 
@@ -392,6 +410,10 @@ export default function CatalogoAdminPage() {
     });
     setProdSeleccionado({
       ...prod,
+      marca: normalizarMarca(prod.marca),
+      piezas_por_paquete: Number(prod.piezas_por_paquete || 0),
+      etiqueta_web: prod.etiqueta_web || 'normal',
+      publicado_web: prod.publicado_web !== false,
       _fechaInicioInput: isoAFechaInput(prod.descuento_inicio),
       _fechaFinInput: isoAFechaInput(prod.descuento_fin)
     });
@@ -410,7 +432,7 @@ export default function CatalogoAdminPage() {
     setCargando(true);
     const [{ data: cats }, { data: prods }, { data: bans }, { data: logs }] = await Promise.all([
       supabase.from('tbl_categorias').select('*').order('id_categoria'),
-      supabase.from('tbl_productos').select('*, tbl_categorias(nombre_categoria)').order('id_producto'),
+      supabase.from('tbl_productos').select('*, tbl_categorias(nombre_categoria, slug)').order('id_producto'),
       supabase.from('tbl_promociones_banners').select('*').order('id_promocion'),
       supabase.from('tbl_bitacora_auditoria').select('*').order('fecha_registro', { ascending: false }).limit(250)
     ]);
@@ -445,12 +467,43 @@ export default function CatalogoAdminPage() {
   const productosActivos = productos.filter(p => p.activo !== false);
   const productosInactivos = productos.filter(p => p.activo === false);
 
-  const marcasDisponibles = Array.from(
-    new Set([
-      ...MARCAS_DISPONIBLES_BASE,
-      ...productos.map(p => p.marca).filter(Boolean)
-    ])
-  ).sort((a, b) => a.localeCompare(b, 'es'));
+  // Marcas comerciales (incluye Dulcerías Candy y marcas registradas en BD)
+  const marcasComerciales = useMemo(() => {
+    const limpias = productos
+      .map(p => normalizarMarca(p.marca))
+      .filter(m => m !== SIN_MARCA);
+
+    return Array.from(new Set([...MARCAS_DISPONIBLES_BASE, ...limpias])).sort((a, b) =>
+      a.localeCompare(b, 'es')
+    );
+  }, [productos]);
+
+  // Destinos de banners generados dinámicamente con categorías y marcas reales + Aguinaldos
+  const destinosBanner = useMemo(() => {
+    const base = [
+      { valor: '#oferta', etiqueta: 'Promoción: Productos con descuento activo (Buen Fin / Ofertas)' },
+      { valor: '#catalogo', etiqueta: 'Catálogo completo (Todos los productos)' },
+      { valor: '#pinata', etiqueta: 'Sección: Armador de Piñata interactivo' },
+      { valor: '#aguinaldos', etiqueta: 'Sección: Armador de Aguinaldos (Bolsitas)' }
+    ];
+
+    const deCategorias = categorias.map(c => ({
+      valor: `#cat:${c.slug || c.nombre_categoria.toLowerCase()}`,
+      etiqueta: `Categoría: ${c.nombre_categoria}`
+    }));
+
+    const deMarcas = marcasComerciales.map(m => ({
+      valor: `#marca:${m}`,
+      etiqueta: `Marca: ${m}`
+    }));
+
+    return [...base, ...deCategorias, ...deMarcas];
+  }, [categorias, marcasComerciales]);
+
+  const opcionesDestinoBanner = useMemo(
+    () => destinosBanner.map(d => ({ value: d.valor, label: d.etiqueta })),
+    [destinosBanner]
+  );
 
   const resolverImagenProducto = url => {
     if (!url) return '/img/ICONO.png';
@@ -486,7 +539,9 @@ export default function CatalogoAdminPage() {
   const productosFiltrados = productosActivos
     .filter(p => {
       if (filtroCat !== 'todas' && String(p.id_categoria) !== String(filtroCat)) return false;
-      if (filtroMarca !== 'todas' && (p.marca || '').toLowerCase() !== filtroMarca.toLowerCase()) return false;
+
+      const marcaNorm = normalizarMarca(p.marca);
+      if (filtroMarca !== 'todas' && marcaNorm.toLowerCase() !== filtroMarca.toLowerCase()) return false;
 
       const stock = Number(p.stock_web || 0);
       if (filtroStock === 'disponible' && stock <= 0) return false;
@@ -494,12 +549,21 @@ export default function CatalogoAdminPage() {
       if (filtroStock === 'agotado' && stock > 0) return false;
 
       const vig = evaluarVigenciaDescuento(p);
+      const piezas = Number(p.piezas_por_paquete || 0);
+      const slugCat = p.tbl_categorias?.slug || '';
+
       if (filtroOferta === 'con_descuento' && !vig.activoEnTienda) return false;
       if (filtroOferta === 'sin_descuento' && vig.activoEnTienda) return false;
       if (filtroOferta === 'vencidos' && vig.estado !== 'vencido') return false;
+      if (filtroOferta === 'aguinaldos' && !(piezas > 0 && slugCat !== 'fiesta')) return false;
+      if (filtroOferta === 'sin_piezas' && piezas > 0) return false;
+      if (filtroOferta === 'top' && p.etiqueta_web !== 'top') return false;
+      if (filtroOferta === 'nuevo' && p.etiqueta_web !== 'nuevo') return false;
+      if (filtroOferta === 'solo_erp' && p.publicado_web !== false) return false;
+      if (filtroOferta === 'publicados_web' && p.publicado_web === false) return false;
 
       if (busqueda.trim()) {
-        const texto = `${p.codigo_barras} ${p.nombre_dulce} ${p.marca || ''} ${p.presentacion || ''}`.toLowerCase();
+        const texto = `${p.codigo_barras} ${p.nombre_dulce} ${marcaNorm} ${p.presentacion || ''}`.toLowerCase();
         if (!texto.includes(busqueda.trim().toLowerCase())) return false;
       }
       return true;
@@ -512,6 +576,9 @@ export default function CatalogoAdminPage() {
       if (ordenPor === 'descuento_desc') return Number(b.porcentaje_descuento || 0) - Number(a.porcentaje_descuento || 0);
       return Number(a.id_categoria) - Number(b.id_categoria) || a.id_producto - b.id_producto;
     });
+
+  const borradoresEnFiltro = productosFiltrados.filter(p => p.publicado_web === false);
+  const totalBorradoresActivos = productosActivos.filter(p => p.publicado_web === false).length;
 
   const totalPaginas = Math.max(1, Math.ceil(productosFiltrados.length / porPagina));
   const pagSegura = Math.min(paginaActual, totalPaginas);
@@ -542,7 +609,7 @@ export default function CatalogoAdminPage() {
       return productosActivos.filter(p => String(p.id_categoria) === String(descMasivo.id_categoria));
     }
     if (descMasivo.alcance === 'marca') {
-      return productosActivos.filter(p => (p.marca || '').toLowerCase() === descMasivo.marca.toLowerCase());
+      return productosActivos.filter(p => normalizarMarca(p.marca).toLowerCase() === descMasivo.marca.toLowerCase());
     }
     return [];
   };
@@ -635,6 +702,40 @@ export default function CatalogoAdminPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  async function publicarBorradoresFiltrados() {
+    if (borradoresEnFiltro.length === 0) return;
+
+    setPublicandoMasivo(true);
+    const ids = borradoresEnFiltro.map(p => p.id_producto);
+    const ahoraIso = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('tbl_productos')
+      .update({
+        publicado_web: true,
+        ultima_modificacion_por: usuarioActual.nombre,
+        fecha_ultima_modificacion: ahoraIso
+      })
+      .in('id_producto', ids);
+
+    setPublicandoMasivo(false);
+
+    if (error) {
+      notificar('Error al publicar borradores: ' + error.message, 'error');
+    } else {
+      await registrarEnBitacora({
+        tipo_accion: 'VISIBILIDAD_WEB',
+        id_referencia: 'masivo',
+        nombre_referencia: `${ids.length} productos publicados`,
+        descripcion_cambio: `Publicó en la tienda web ${ids.length} productos que estaban como Borrador (Solo SIGE Candy)`,
+        valor_anterior: 'Solo SIGE Candy (Borrador)',
+        valor_nuevo: 'Publicado en Tienda Web'
+      });
+      notificar(`${ids.length} productos publicados en la tienda en línea`);
+      cargarDatos();
+    }
+  }
+
   async function guardarCambiosProducto(prod) {
     setGuardandoDetalle(true);
     const original = productos.find(item => item.id_producto === prod.id_producto) || {};
@@ -642,6 +743,13 @@ export default function CatalogoAdminPage() {
     const ahoraIso = new Date().toISOString();
 
     const pctNum = Number(prod.porcentaje_descuento || 0);
+    const piezasNum = Math.max(0, Math.round(Number(prod.piezas_por_paquete || 0)));
+    const etiquetaNueva = prod.etiqueta_web || 'normal';
+    const marcaNueva = normalizarMarca(prod.marca);
+    const marcaOriginal = normalizarMarca(original.marca);
+    const publicadoNuevo = prod.publicado_web !== false;
+    const publicadoOriginal = original.publicado_web !== false;
+
     const isoInicio = pctNum > 0 && prod._fechaInicioInput ? fechaInputAIso(prod._fechaInicioInput, false) : null;
     const isoFin = pctNum > 0 && prod._fechaFinInput ? fechaInputAIso(prod._fechaFinInput, true) : null;
 
@@ -664,6 +772,21 @@ export default function CatalogoAdminPage() {
       valoresAntes.push(original.descuento_fin ? `Vencía: ${isoAFechaInput(original.descuento_fin)}` : 'Sin fecha límite');
       valoresNuevos.push(prod._fechaFinInput ? `Vence: ${prod._fechaFinInput} 23:59` : 'Permanente');
     }
+    if (Number(original.piezas_por_paquete || 0) !== piezasNum) {
+      cambiosDetectados.push('Piezas por paquete (Aguinaldos)');
+      valoresAntes.push(`${original.piezas_por_paquete || 0} pzas`);
+      valoresNuevos.push(`${piezasNum} pzas`);
+    }
+    if ((original.etiqueta_web || 'normal') !== etiquetaNueva) {
+      cambiosDetectados.push('Destacado en tienda');
+      valoresAntes.push(`Etiqueta: ${original.etiqueta_web || 'normal'}`);
+      valoresNuevos.push(`Etiqueta: ${etiquetaNueva}`);
+    }
+    if (publicadoOriginal !== publicadoNuevo) {
+      cambiosDetectados.push('Visibilidad en tienda web');
+      valoresAntes.push(publicadoOriginal ? 'Publicado en web' : 'Solo SIGE Candy');
+      valoresNuevos.push(publicadoNuevo ? 'Publicado en web' : 'Solo SIGE Candy');
+    }
     if (Number(original.stock_web || 0) !== Number(prod.stock_web || 0)) {
       cambiosDetectados.push('Existencia web');
       valoresAntes.push(`Stock: ${original.stock_web || 0}`);
@@ -674,10 +797,10 @@ export default function CatalogoAdminPage() {
       valoresAntes.push(original.nombre_dulce);
       valoresNuevos.push(prod.nombre_dulce);
     }
-    if ((original.marca || '') !== (prod.marca || '')) {
+    if (marcaOriginal !== marcaNueva) {
       cambiosDetectados.push('Marca');
-      valoresAntes.push(`Marca: ${original.marca || 'Sin marca'}`);
-      valoresNuevos.push(`Marca: ${prod.marca}`);
+      valoresAntes.push(`Marca: ${marcaOriginal}`);
+      valoresNuevos.push(`Marca: ${marcaNueva}`);
     }
     if ((original.presentacion || '') !== (prod.presentacion || '')) {
       cambiosDetectados.push('Presentación');
@@ -691,8 +814,8 @@ export default function CatalogoAdminPage() {
     }
     if (Boolean(original.es_transaccional) !== Boolean(prod.es_transaccional)) {
       cambiosDetectados.push('Modalidad de venta');
-      valoresAntes.push(original.es_transaccional ? 'Carrito' : 'Cotización');
-      valoresNuevos.push(prod.es_transaccional ? 'Carrito' : 'Cotización');
+      valoresAntes.push(original.es_transaccional ? 'Checkout en línea' : 'Cotización');
+      valoresNuevos.push(prod.es_transaccional ? 'Checkout en línea' : 'Cotización');
     }
     if ((original.imagen_url || '') !== (prod.imagen_url || '')) {
       cambiosDetectados.push('Fotografía');
@@ -705,8 +828,11 @@ export default function CatalogoAdminPage() {
         nombre_dulce: prod.nombre_dulce,
         descripcion: prod.descripcion || '',
         id_categoria: Number(prod.id_categoria),
-        marca: prod.marca || 'Dulcerías Candy',
+        marca: marcaParaDB(prod.marca),
         presentacion: prod.presentacion,
+        piezas_por_paquete: piezasNum,
+        etiqueta_web: etiquetaNueva,
+        publicado_web: publicadoNuevo,
         precio_unitario: Number(prod.precio_unitario),
         precio_mayoreo_5_mas: precioMayoreo,
         porcentaje_descuento: pctNum,
@@ -728,7 +854,9 @@ export default function CatalogoAdminPage() {
     } else {
       if (cambiosDetectados.length > 0) {
         await registrarEnBitacora({
-          tipo_accion: 'EDICION_PRECIO_DATOS',
+          tipo_accion: cambiosDetectados.length === 1 && cambiosDetectados[0] === 'Visibilidad en tienda web'
+            ? 'VISIBILIDAD_WEB'
+            : 'EDICION_PRECIO_DATOS',
           id_referencia: prod.codigo_barras || prod.id_producto,
           nombre_referencia: prod.nombre_dulce,
           descripcion_cambio: `Actualizó ${cambiosDetectados.join(', ')}`,
@@ -775,7 +903,7 @@ export default function CatalogoAdminPage() {
         id_referencia: prod.codigo_barras || prod.id_producto,
         nombre_referencia: prod.nombre_dulce,
         descripcion_cambio: `Dio de baja del catálogo por: ${datosBaja.motivo}${datosBaja.comentario ? ` (${datosBaja.comentario.trim()})` : ''}`,
-        valor_anterior: 'Estado: Activo en tienda',
+        valor_anterior: 'Estado: Activo',
         valor_nuevo: `Baja (${datosBaja.motivo})`
       });
 
@@ -808,12 +936,12 @@ export default function CatalogoAdminPage() {
         tipo_accion: 'REACTIVACION',
         id_referencia: prod.codigo_barras || prod.id_producto,
         nombre_referencia: prod.nombre_dulce,
-        descripcion_cambio: `Republicó el producto en el catálogo activo (Precio: $${Number(prod.precio_unitario).toFixed(2)})`,
+        descripcion_cambio: `Reactivó el producto en el catálogo activo (Precio: $${Number(prod.precio_unitario).toFixed(2)})`,
         valor_anterior: `Inactivo (${prod.motivo_baja || 'Archivado'})`,
-        valor_nuevo: 'Estado: Activo en tienda'
+        valor_nuevo: prod.publicado_web === false ? 'Activo (Solo SIGE Candy)' : 'Activo en Tienda Web'
       });
 
-      notificar(`"${prod.nombre_dulce}" fue republicado en la tienda en línea`);
+      notificar(`"${prod.nombre_dulce}" fue reactivado correctamente`);
       if (desdeDrawer) cerrarInspector();
       cargarDatos();
     }
@@ -863,6 +991,8 @@ export default function CatalogoAdminPage() {
     e.preventDefault();
     const precioUnit = Number(nuevoProd.precio_unitario);
     const pctNum = Number(nuevoProd.porcentaje_descuento || 0);
+    const piezasNum = Math.max(0, Math.round(Number(nuevoProd.piezas_por_paquete || 0)));
+    const publicadoWeb = nuevoProd.publicado_web !== false;
     const ahoraIso = new Date().toISOString();
 
     const { error } = await supabase.from('tbl_productos').insert([{
@@ -870,8 +1000,11 @@ export default function CatalogoAdminPage() {
       nombre_dulce: nuevoProd.nombre_dulce,
       descripcion: nuevoProd.descripcion,
       id_categoria: nuevoProd.id_categoria,
-      marca: nuevoProd.marca,
+      marca: marcaParaDB(nuevoProd.marca),
       presentacion: nuevoProd.presentacion,
+      piezas_por_paquete: piezasNum,
+      etiqueta_web: nuevoProd.etiqueta_web || 'normal',
+      publicado_web: publicadoWeb,
       precio_unitario: precioUnit,
       precio_mayoreo_5_mas: Number((precioUnit * 0.95).toFixed(2)),
       porcentaje_descuento: pctNum,
@@ -893,7 +1026,7 @@ export default function CatalogoAdminPage() {
         tipo_accion: 'ALTA_PRODUCTO',
         id_referencia: nuevoProd.codigo_barras,
         nombre_referencia: nuevoProd.nombre_dulce,
-        descripcion_cambio: `Registró nuevo producto en el catálogo (${nuevoProd.marca} · ${nuevoProd.presentacion})`,
+        descripcion_cambio: `Registró nuevo producto (${normalizarMarca(nuevoProd.marca)} · ${nuevoProd.presentacion}${piezasNum > 0 ? ` · ${piezasNum} pzas/paq` : ''}${publicadoWeb ? '' : ' · Borrador Solo SIGE Candy'})`,
         valor_anterior: 'Nuevo registro',
         valor_nuevo: `Precio: $${precioUnit.toFixed(2)} · Stock: ${nuevoProd.stock_web}`
       });
@@ -907,6 +1040,8 @@ export default function CatalogoAdminPage() {
         id_categoria: categorias[0]?.id_categoria || 1,
         marca: 'Ricolino',
         presentacion: 'Bolsa 1 kg',
+        piezas_por_paquete: 0,
+        etiqueta_web: 'normal',
         precio_unitario: '',
         porcentaje_descuento: 0,
         descuento_inicio: '',
@@ -914,6 +1049,7 @@ export default function CatalogoAdminPage() {
         tope_maximo_compra: 20,
         stock_web: 25,
         es_transaccional: true,
+        publicado_web: true,
         imagen_url: 'img/Gomita.png'
       });
       cargarDatos();
@@ -982,7 +1118,7 @@ export default function CatalogoAdminPage() {
 
       if (error) throw new Error(error.message);
 
-      const nombreDestino = DESTINOS_BANNER.find(d => d.valor === nuevoBanner.destino)?.etiqueta || nuevoBanner.destino;
+      const nombreDestino = destinosBanner.find(d => d.valor === nuevoBanner.destino)?.etiqueta || nuevoBanner.destino;
 
       await registrarEnBitacora({
         tipo_accion: 'EDICION_BANNER',
@@ -1127,18 +1263,30 @@ export default function CatalogoAdminPage() {
 
   const opcionesMarcaConTodas = [
     { value: 'todas', label: 'Todas las marcas' },
-    ...marcasDisponibles.map(m => ({
+    ...marcasComerciales.map(m => ({
       value: m,
       label: m,
-      badge: productosActivos.filter(p => (p.marca || '').toLowerCase() === m.toLowerCase()).length
-    }))
+      badge: productosActivos.filter(p => normalizarMarca(p.marca).toLowerCase() === m.toLowerCase()).length
+    })),
+    {
+      value: SIN_MARCA,
+      label: SIN_MARCA,
+      badge: productosActivos.filter(p => normalizarMarca(p.marca) === SIN_MARCA).length
+    }
   ];
 
-  const opcionesMarcaSimples = marcasDisponibles.map(m => ({
-    value: m,
-    label: m,
-    badge: productosActivos.filter(p => (p.marca || '').toLowerCase() === m.toLowerCase()).length
-  }));
+  const opcionesMarcaProducto = [
+    ...marcasComerciales.map(m => ({
+      value: m,
+      label: m,
+      badge: productosActivos.filter(p => normalizarMarca(p.marca).toLowerCase() === m.toLowerCase()).length
+    })),
+    {
+      value: SIN_MARCA,
+      label: SIN_MARCA,
+      badge: productosActivos.filter(p => normalizarMarca(p.marca) === SIN_MARCA).length
+    }
+  ];
 
   function renderTarjetaProductoCompacta(p) {
     const vig = evaluarVigenciaDescuento(p);
@@ -1148,6 +1296,8 @@ export default function CatalogoAdminPage() {
       : precioBase.toFixed(2);
     const mayoreo = (precioBase * 0.95).toFixed(2);
     const agotado = Number(p.stock_web) <= 0;
+    const marcaTxt = normalizarMarca(p.marca);
+    const piezas = Number(p.piezas_por_paquete || 0);
 
     return (
       <article
@@ -1166,14 +1316,32 @@ export default function CatalogoAdminPage() {
         <div className="erp-prod-row-card__info">
           <div className="erp-prod-row-card__meta">
             <span className="erp-prod-row-card__code">{p.codigo_barras}</span>
-            <span>·</span>
-            <span style={{ fontWeight: 600, color: 'var(--uva)' }}>{p.marca || 'Dulcerías Candy'}</span>
+            {marcaTxt !== SIN_MARCA && (
+              <>
+                <span>·</span>
+                <span style={{ fontWeight: 600, color: 'var(--uva)' }}>{marcaTxt}</span>
+              </>
+            )}
+            {p.publicado_web === false && (
+              <span className="erp-badge erp-badge--naranja" style={{ fontSize: 9.5, padding: '1px 6px' }}>
+                Solo SIGE
+              </span>
+            )}
+            {p.etiqueta_web === 'top' && (
+              <span className="erp-badge erp-badge--amarillo" style={{ fontSize: 9.5, padding: '1px 6px' }}>Top</span>
+            )}
+            {p.etiqueta_web === 'nuevo' && (
+              <span className="erp-badge erp-badge--uva" style={{ fontSize: 9.5, padding: '1px 6px' }}>Nuevo</span>
+            )}
           </div>
           <h3 className="erp-prod-row-card__name" title={p.nombre_dulce}>
             {p.nombre_dulce}
           </h3>
           <div className="erp-prod-row-card__pres">
-            {p.presentacion || 'Pieza'} · {vig.estado === 'vencido' ? 'Oferta finalizada' : p.es_transaccional ? 'Carrito' : 'Cotización'}
+            {p.presentacion || 'Pieza'}
+            {piezas > 0 ? ` · ${piezas} pzas` : ''}
+            {' · '}
+            {vig.estado === 'vencido' ? 'Oferta finalizada' : p.es_transaccional ? 'Checkout' : 'Cotización'}
           </div>
         </div>
 
@@ -1212,6 +1380,8 @@ export default function CatalogoAdminPage() {
     const precioConOferta = vig.activoEnTienda ? (precioBase * (1 - vig.pctEfectivo / 100)).toFixed(2) : null;
     const mayoreo = (precioBase * 0.95).toFixed(2);
     const agotado = Number(p.stock_web) <= 0;
+    const marcaTxt = normalizarMarca(p.marca);
+    const piezas = Number(p.piezas_por_paquete || 0);
 
     return (
       <article
@@ -1242,15 +1412,30 @@ export default function CatalogoAdminPage() {
               <span className="erp-badge erp-badge--uva" style={{ fontSize: 10, padding: '2px 7px' }}>
                 {p.tbl_categorias?.nombre_categoria || 'General'}
               </span>
-              <span className="erp-badge erp-badge--amarillo" style={{ fontSize: 10, padding: '2px 7px' }}>
-                {p.marca || 'Dulcerías Candy'}
-              </span>
+              {marcaTxt !== SIN_MARCA && (
+                <span className="erp-badge erp-badge--amarillo" style={{ fontSize: 10, padding: '2px 7px' }}>
+                  {marcaTxt}
+                </span>
+              )}
+              {p.publicado_web === false && (
+                <span className="erp-badge erp-badge--naranja" style={{ fontSize: 10, padding: '2px 7px' }}>
+                  Solo SIGE
+                </span>
+              )}
+              {p.etiqueta_web === 'top' && (
+                <span className="erp-badge erp-badge--marca" style={{ fontSize: 10, padding: '2px 7px' }}>Más vendido</span>
+              )}
+              {p.etiqueta_web === 'nuevo' && (
+                <span className="erp-badge erp-badge--verde" style={{ fontSize: 10, padding: '2px 7px' }}>Nuevo</span>
+              )}
             </div>
             <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--texto)', lineHeight: 1.28, marginBottom: 2 }}>
               {p.nombre_dulce}
             </h3>
             <p style={{ fontSize: 12, color: 'var(--texto-2)' }}>
-              {p.presentacion || 'Pieza'} · Tope: {p.tope_maximo_compra} pzas
+              {p.presentacion || 'Pieza'}
+              {piezas > 0 ? ` · ${piezas} pzas/paq` : ''}
+              {` · Tope: ${p.tope_maximo_compra}`}
             </p>
           </div>
         </div>
@@ -1278,10 +1463,12 @@ export default function CatalogoAdminPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--linea)' }}>
           <span style={{ fontSize: 11.5, color: 'var(--texto-2)', fontWeight: 600 }}>
-            {p.descuento_fin && vig.activoEnTienda
+            {p.publicado_web === false
+              ? 'Oculto en tienda web (Borrador)'
+              : p.descuento_fin && vig.activoEnTienda
               ? `Vence: ${isoAFechaInput(p.descuento_fin)} 23:59`
               : p.es_transaccional
-              ? 'Venta en Carrito'
+              ? 'Compra en línea'
               : 'Cotización WhatsApp'}
           </span>
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--marca)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -1360,14 +1547,15 @@ export default function CatalogoAdminPage() {
       const items = productosFiltrados.filter(p => Number(p.id_categoria) === Number(cat.id_categoria));
       const conDescuento = items.filter(i => evaluarVigenciaDescuento(i).activoEnTienda).length;
       const agotados = items.filter(i => Number(i.stock_web) <= 0).length;
-      return { ...cat, items, conDescuento, agotados };
+      const borradores = items.filter(i => i.publicado_web === false).length;
+      return { ...cat, items, conDescuento, agotados, borradores };
     })
     .filter(g => g.items.length > 0);
 
   const bajasFiltradas = productosInactivos.filter(p => {
     if (filtroMotivoBaja !== 'todos' && (p.motivo_baja || 'Sin motivo') !== filtroMotivoBaja) return false;
     if (busquedaBajas.trim()) {
-      const txt = `${p.codigo_barras} ${p.nombre_dulce} ${p.marca || ''} ${p.motivo_baja || ''} ${p.comentario_baja || ''}`.toLowerCase();
+      const txt = `${p.codigo_barras} ${p.nombre_dulce} ${normalizarMarca(p.marca)} ${p.motivo_baja || ''} ${p.comentario_baja || ''}`.toLowerCase();
       if (!txt.includes(busquedaBajas.trim().toLowerCase())) return false;
     }
     return true;
@@ -1386,7 +1574,7 @@ export default function CatalogoAdminPage() {
 
   const obtenerDatosSimuladorBanner = () => {
     if (bannerEnSimulador === 'nuevo') {
-      const etqDest = DESTINOS_BANNER.find(d => d.valor === nuevoBanner.destino)?.etiqueta || 'Catálogo completo';
+      const etqDest = destinosBanner.find(d => d.valor === nuevoBanner.destino)?.etiqueta || 'Catálogo completo';
       return {
         tag: nuevoBanner.tag_corto || 'PROMOCIÓN EXCLUSIVA',
         titulo: nuevoBanner.titulo || 'Título del Banner',
@@ -1403,7 +1591,7 @@ export default function CatalogoAdminPage() {
     if (b) {
       const { tag, desc, destino } = descomponerLeyendaBanner(b.leyenda_exclusividad, b.imagen_banner_url);
       const urlActiva = previewsBannersEdit[b.id_promocion] || b.imagen_banner_url;
-      const etqDest = DESTINOS_BANNER.find(d => d.valor === destino)?.etiqueta || 'Catálogo completo';
+      const etqDest = destinosBanner.find(d => d.valor === destino)?.etiqueta || 'Catálogo completo';
       return {
         tag,
         titulo: b.titulo || 'Título del Banner',
@@ -1415,9 +1603,9 @@ export default function CatalogoAdminPage() {
     }
 
     return {
-      tag: 'ENVÍO GRATIS',
-      titulo: 'Desde $399 te lo llevamos',
-      descripcion: 'Dentro de la ciudad de Puebla, sin costo de envío.',
+      tag: 'ENVÍO A DOMICILIO',
+      titulo: 'Te lo llevamos a casa',
+      descripcion: 'Dentro de la ciudad de Puebla, o recógelo gratis en sucursal.',
       destinoEtiqueta: 'Catálogo completo',
       estiloFondo: construirEstiloFondoBanner('', 0),
       nombreSeleccionado: 'Banner Principal'
@@ -1426,17 +1614,28 @@ export default function CatalogoAdminPage() {
 
   const datosPreview = obtenerDatosSimuladorBanner();
 
+  // Cálculo en vivo para costo por pieza en el inspector (Aguinaldos)
+  const esBolsaCelofanSistema =
+    prodSeleccionado && String(prodSeleccionado.codigo_barras || '').toLowerCase() === 'fie-06';
+
+  const costoPorPiezaInspector =
+    prodSeleccionado &&
+    Number(prodSeleccionado.piezas_por_paquete) > 0 &&
+    Number(prodSeleccionado.precio_unitario) > 0
+      ? (Number(prodSeleccionado.precio_unitario) / Number(prodSeleccionado.piezas_por_paquete)).toFixed(2)
+      : null;
+
   return (
     <div>
-      {/* ENCABEZADO CORPORATIVO CON LAS 4 SECCIONES */}
+      {/* ENCABEZADO CORPORATIVO */}
       <div className="erp-page-header erp-anim-1">
         <div>
           <span className="erp-badge erp-badge--uva">
-            Sesión activa: {usuarioActual.nombre}
+            SIGE Candy · Sesión: {usuarioActual.nombre}
           </span>
           <h1 className="erp-page-title">Gestión de Catálogo, Descuentos y Auditoría</h1>
           <p className="erp-page-subtitle">
-            Control de productos activos, promociones programadas con cierre automático a las 23:59 hrs, bajas y bitácora.
+            Control de productos activos, carga masiva desde Excel, borradores, aguinaldos, promociones 23:59 hrs y bitácora.
           </p>
         </div>
 
@@ -1529,6 +1728,15 @@ export default function CatalogoAdminPage() {
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 type="button"
+                onClick={() => setPanelAbierto(panelAbierto === 'importar_excel' ? null : 'importar_excel')}
+                className={`erp-btn ${panelAbierto === 'importar_excel' ? 'erp-btn--uva' : 'erp-btn--secundario'}`}
+              >
+                <ErpIcon name="clipboard" size={15} />
+                <span>{panelAbierto === 'importar_excel' ? 'Cerrar Importador' : 'Importar Excel'}</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setPanelAbierto(panelAbierto === 'descuentos_masivos' ? null : 'descuentos_masivos')}
                 className={`erp-btn ${panelAbierto === 'descuentos_masivos' ? 'erp-btn--uva' : 'erp-btn--secundario'}`}
               >
@@ -1597,7 +1805,7 @@ export default function CatalogoAdminPage() {
                         value={descMasivo.marca}
                         onChange={val => setDescMasivo({ ...descMasivo, marca: val })}
                         searchPlaceholder="Buscar marca..."
-                        options={opcionesMarcaSimples}
+                        options={opcionesMarcaProducto}
                       />
                     </div>
                   )}
@@ -1730,17 +1938,28 @@ export default function CatalogoAdminPage() {
                     />
                   </div>
                   <div>
-                    <label className="erp-label">Marca *</label>
+                    <label className="erp-label">Marca</label>
                     <ErpSelect
                       value={nuevoProd.marca}
                       onChange={val => setNuevoProd({ ...nuevoProd, marca: val })}
                       searchPlaceholder="Buscar marca..."
-                      options={opcionesMarcaSimples}
+                      options={opcionesMarcaProducto}
                     />
                   </div>
                   <div>
                     <label className="erp-label">Presentación *</label>
-                    <input required className="erp-input" placeholder="Bolsa, caja o paquete" value={nuevoProd.presentacion} onChange={e => setNuevoProd({ ...nuevoProd, presentacion: e.target.value })} />
+                    <input required className="erp-input" placeholder="Bolsa 1 kg, caja 30 pzas..." value={nuevoProd.presentacion} onChange={e => setNuevoProd({ ...nuevoProd, presentacion: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="erp-label">Piezas por paquete (Aguinaldos)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="erp-input"
+                      placeholder="Ej. 50 (0 si no aplica)"
+                      value={nuevoProd.piezas_por_paquete}
+                      onChange={e => setNuevoProd({ ...nuevoProd, piezas_por_paquete: e.target.value })}
+                    />
                   </div>
                   <div>
                     <label className="erp-label">Precio Unitario ($ MXN) *</label>
@@ -1753,6 +1972,25 @@ export default function CatalogoAdminPage() {
                   <div>
                     <label className="erp-label">Existencia Inicial</label>
                     <input type="number" className="erp-input" value={nuevoProd.stock_web} onChange={e => setNuevoProd({ ...nuevoProd, stock_web: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="erp-label">Destacado en Tienda</label>
+                    <ErpSelect
+                      value={nuevoProd.etiqueta_web}
+                      onChange={val => setNuevoProd({ ...nuevoProd, etiqueta_web: val })}
+                      options={OPCIONES_ETIQUETA_WEB}
+                    />
+                  </div>
+                  <div>
+                    <label className="erp-label">Visibilidad en Tienda Web</label>
+                    <ErpSelect
+                      value={nuevoProd.publicado_web !== false ? 'web' : 'borrador'}
+                      onChange={val => setNuevoProd({ ...nuevoProd, publicado_web: val === 'web' })}
+                      options={[
+                        { value: 'web', label: 'Publicado en Tienda Web' },
+                        { value: 'borrador', label: 'Borrador (Solo en SIGE Candy)' }
+                      ]}
+                    />
                   </div>
 
                   <div style={{ gridColumn: '1 / -1' }}>
@@ -1792,7 +2030,22 @@ export default function CatalogoAdminPage() {
             </div>
           </div>
 
-          {/* BARRA DE FILTRADO AVANZADO CON ErpSelect */}
+          {/* ACORDEÓN 3: IMPORTACIÓN MASIVA DESDE EXCEL */}
+          <div className={`erp-collapse ${panelAbierto === 'importar_excel' ? 'abierto' : ''}`}>
+            <div className="erp-collapse__inner">
+              <ErpImportarExcel
+                supabase={supabase}
+                categorias={categorias}
+                productosExistentes={productos}
+                usuarioActual={usuarioActual}
+                onImportSuccess={cargarDatos}
+                onNotificar={notificar}
+                onCerrar={() => setPanelAbierto(null)}
+              />
+            </div>
+          </div>
+
+          {/* BARRA DE FILTRADO AVANZADO */}
           <div className="erp-card erp-anim-2" style={{ padding: '16px 20px', marginBottom: 18 }}>
             <div className="erp-adv-filters">
               <div>
@@ -1846,15 +2099,21 @@ export default function CatalogoAdminPage() {
               </div>
 
               <div>
-                <label className="erp-label">Promoción</label>
+                <label className="erp-label">Promoción / Estado Web</label>
                 <ErpSelect
                   value={filtroOferta}
                   onChange={setFiltroOferta}
                   options={[
-                    { value: 'todos', label: 'Todos los precios' },
+                    { value: 'todos', label: 'Todos los productos' },
+                    { value: 'solo_erp', label: 'Solo SIGE Candy (Borradores)', badge: totalBorradoresActivos },
+                    { value: 'publicados_web', label: 'Publicados en Tienda Web' },
                     { value: 'con_descuento', label: 'Con descuento vigente' },
                     { value: 'sin_descuento', label: 'Precio regular (0%)' },
-                    { value: 'vencidos', label: 'Ofertas vencidas' }
+                    { value: 'vencidos', label: 'Ofertas vencidas' },
+                    { value: 'aguinaldos', label: 'Aptos para Aguinaldos (pzas > 0)' },
+                    { value: 'sin_piezas', label: 'Sin piezas por paquete (= 0)' },
+                    { value: 'top', label: 'Destacados: Más vendidos' },
+                    { value: 'nuevo', label: 'Destacados: Novedades' }
                   ]}
                 />
               </div>
@@ -1876,32 +2135,56 @@ export default function CatalogoAdminPage() {
               </div>
             </div>
 
-            {hayFiltrosActivos && (
+            {(hayFiltrosActivos || totalBorradoresActivos > 0) && (
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--linea)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontSize: 12.5, color: 'var(--texto-2)' }}>
-                  Resultados filtrados: <b>{productosFiltrados.length}</b> de <b>{productosActivos.length}</b> productos activos.
+                  {hayFiltrosActivos ? (
+                    <>Resultados filtrados: <b>{productosFiltrados.length}</b> de <b>{productosActivos.length}</b> productos activos.</>
+                  ) : (
+                    <>Tienes <b>{totalBorradoresActivos}</b> {totalBorradoresActivos === 1 ? 'producto en borrador' : 'productos en borrador'} (Solo SIGE Candy).</>
+                  )}
                 </span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDescMasivo(prev => ({ ...prev, alcance: 'filtrados' }));
-                      setPanelAbierto('descuentos_masivos');
-                    }}
-                    className="erp-btn erp-btn--secundario"
-                    style={{ padding: '5px 11px', fontSize: 11.5 }}
-                  >
-                    <ErpIcon name="tag" size={13} />
-                    <span>Programar descuento a estos {productosFiltrados.length} productos</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={limpiarFiltros}
-                    className="erp-btn erp-btn--secundario"
-                    style={{ padding: '5px 11px', fontSize: 11.5, color: 'var(--naranja)' }}
-                  >
-                    Limpiar filtros
-                  </button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {borradoresEnFiltro.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={publicandoMasivo}
+                      onClick={publicarBorradoresFiltrados}
+                      className="erp-btn erp-btn--primario"
+                      style={{ padding: '5px 11px', fontSize: 11.5, background: '#00A650' }}
+                    >
+                      <ErpIcon name="check" size={13} />
+                      <span>
+                        {publicandoMasivo
+                          ? 'Publicando...'
+                          : `Publicar ${borradoresEnFiltro.length} borradores en web`}
+                      </span>
+                    </button>
+                  )}
+                  {hayFiltrosActivos && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDescMasivo(prev => ({ ...prev, alcance: 'filtrados' }));
+                          setPanelAbierto('descuentos_masivos');
+                        }}
+                        className="erp-btn erp-btn--secundario"
+                        style={{ padding: '5px 11px', fontSize: 11.5 }}
+                      >
+                        <ErpIcon name="tag" size={13} />
+                        <span>Programar descuento a estos {productosFiltrados.length} productos</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={limpiarFiltros}
+                        className="erp-btn erp-btn--secundario"
+                        style={{ padding: '5px 11px', fontSize: 11.5, color: 'var(--naranja)' }}
+                      >
+                        Limpiar filtros
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -2010,6 +2293,11 @@ export default function CatalogoAdminPage() {
                             <h2>{grupo.nombre_categoria}</h2>
                             <div className="erp-cat-panel__meta">
                               <span><b>{grupo.items.length}</b> productos</span>
+                              {grupo.borradores > 0 && (
+                                <span style={{ color: '#C8320A', fontWeight: 600 }}>
+                                  · {grupo.borradores} solo SIGE
+                                </span>
+                              )}
                               {grupo.conDescuento > 0 && (
                                 <span style={{ color: 'var(--marca)', fontWeight: 600 }}>
                                   · {grupo.conDescuento} con descuento vigente
@@ -2092,10 +2380,10 @@ export default function CatalogoAdminPage() {
                       <th>Producto</th>
                       <th>Categoría</th>
                       <th>Marca</th>
+                      <th>Piezas / Paq.</th>
                       <th>Precio Unitario</th>
-                      <th>Vigencia Oferta</th>
+                      <th>Estado Web</th>
                       <th>Disponibilidad</th>
-                      <th>Última Modificación</th>
                       <th style={{ textAlign: 'right' }}>Detalle</th>
                     </tr>
                   </thead>
@@ -2103,6 +2391,8 @@ export default function CatalogoAdminPage() {
                     {productosPaginados.map(p => {
                       const vig = evaluarVigenciaDescuento(p);
                       const agotado = Number(p.stock_web) <= 0;
+                      const piezas = Number(p.piezas_por_paquete || 0);
+                      const marcaTxt = normalizarMarca(p.marca);
                       return (
                         <tr
                           key={p.id_producto}
@@ -2131,8 +2421,13 @@ export default function CatalogoAdminPage() {
                             </span>
                           </td>
                           <td>
-                            <span style={{ fontSize: 12.5, color: 'var(--texto-2)', fontWeight: 600 }}>
-                              {p.marca || 'Dulcerías Candy'}
+                            <span style={{ fontSize: 12.5, color: marcaTxt === SIN_MARCA ? 'var(--tenue)' : 'var(--texto-2)', fontWeight: 600 }}>
+                              {marcaTxt}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: piezas > 0 ? 'var(--uva)' : 'var(--tenue)' }}>
+                              {piezas > 0 ? `${piezas} pzas` : '—'}
                             </span>
                           </td>
                           <td>
@@ -2144,18 +2439,15 @@ export default function CatalogoAdminPage() {
                             )}
                           </td>
                           <td>
-                            <span style={{ fontSize: 11.5, color: vig.activoEnTienda ? 'var(--marca)' : 'var(--texto-2)', fontWeight: 600 }}>
-                              {vig.etiqueta}
-                            </span>
+                            {p.publicado_web === false ? (
+                              <span className="erp-badge erp-badge--naranja">Solo SIGE</span>
+                            ) : (
+                              <span className="erp-badge erp-badge--verde">En Tienda Web</span>
+                            )}
                           </td>
                           <td>
                             <span style={{ fontSize: 12, fontWeight: 600, color: agotado ? '#C8320A' : '#007A3B' }}>
                               {agotado ? 'Agotado (0)' : `${p.stock_web} disp.`}
-                            </span>
-                          </td>
-                          <td>
-                            <span style={{ fontSize: 11.5, color: 'var(--texto-2)' }}>
-                              {p.ultima_modificacion_por || 'Sistema'}
                             </span>
                           </td>
                           <td style={{ textAlign: 'right' }}>
@@ -2184,7 +2476,7 @@ export default function CatalogoAdminPage() {
         </>
       )}
 
-      {/* ══════════ PESTAÑA 2: APARTADO DE PRODUCTOS DADOS DE BAJA (ARCHIVO) ══════════ */}
+      {/* ══════════ PESTAÑA 2: PRODUCTOS DADOS DE BAJA ══════════ */}
       {tab === 'bajas' && (
         <div className="erp-anim-2">
           <div className="erp-card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -2247,7 +2539,7 @@ export default function CatalogoAdminPage() {
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <h3 style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--texto)' }}>{p.nombre_dulce}</h3>
                       <p style={{ fontSize: 12, color: 'var(--texto-2)' }}>
-                        {p.marca || 'Dulcerías Candy'} · {p.presentacion} · <b>${Number(p.precio_unitario).toFixed(2)}</b>
+                        {normalizarMarca(p.marca)} · {p.presentacion} · <b>${Number(p.precio_unitario).toFixed(2)}</b>
                       </p>
                     </div>
                   </div>
@@ -2284,7 +2576,7 @@ export default function CatalogoAdminPage() {
                       style={{ flex: 1, padding: '7px 12px', fontSize: 12 }}
                     >
                       <ErpIcon name="check" size={14} />
-                      <span>Volver a Publicar</span>
+                      <span>Reactivar</span>
                     </button>
                   </div>
                 </article>
@@ -2402,7 +2694,7 @@ export default function CatalogoAdminPage() {
                         value={nuevoBanner.destino}
                         onChange={val => setNuevoBanner({ ...nuevoBanner, destino: val })}
                         searchPlaceholder="Buscar destino, categoría o marca..."
-                        options={OPCIONES_DESTINO_BANNER}
+                        options={opcionesDestinoBanner}
                       />
                     </div>
 
@@ -2452,7 +2744,7 @@ export default function CatalogoAdminPage() {
               const tieneImagenPersonalizada = esUrlImagenFondo(urlFondoActiva);
               const tieneCambioSinGuardar = Boolean(archivosBannersEdit[b.id_promocion]);
               const vigenciaBan = evaluarVigenciaBanner(b);
-              const nombreDestino = DESTINOS_BANNER.find(d => d.valor === destinoActual)?.etiqueta || 'Catálogo completo';
+              const nombreDestino = destinosBanner.find(d => d.valor === destinoActual)?.etiqueta || 'Catálogo completo';
               const estaEditando = bannerEditandoId === b.id_promocion;
 
               return (
@@ -2632,7 +2924,7 @@ export default function CatalogoAdminPage() {
                                   );
                                 }}
                                 searchPlaceholder="Buscar destino, categoría o marca..."
-                                options={OPCIONES_DESTINO_BANNER}
+                                options={opcionesDestinoBanner}
                               />
                             </div>
 
@@ -2728,7 +3020,7 @@ export default function CatalogoAdminPage() {
         </div>
       )}
 
-      {/* ══════════ PESTAÑA 4: BITÁCORA DE AUDITORÍA (EXCLUSIVA ADMINISTRADORES) ══════════ */}
+      {/* ══════════ PESTAÑA 4: BITÁCORA DE AUDITORÍA ══════════ */}
       {tab === 'auditoria' && usuarioActual.rol === 'admin' && (
         <div className="erp-anim-2">
           <div className="erp-card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -2754,6 +3046,8 @@ export default function CatalogoAdminPage() {
                     { value: 'todos', label: 'Todos los tipos de movimiento' },
                     { value: 'EDICION_PRECIO_DATOS', label: 'Modificaciones y Precios' },
                     { value: 'DESCUENTO_MASIVO', label: 'Descuentos Masivos' },
+                    { value: 'IMPORTACION_EXCEL', label: 'Importaciones Excel' },
+                    { value: 'VISIBILIDAD_WEB', label: 'Visibilidad Web' },
                     { value: 'ALTA_PRODUCTO', label: 'Altas de Producto' },
                     { value: 'BAJA_LOGICA', label: 'Bajas de Catálogo' },
                     { value: 'REACTIVACION', label: 'Republicaciones' },
@@ -2880,6 +3174,9 @@ export default function CatalogoAdminPage() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="erp-badge erp-badge--uva">Detalle del Producto</span>
+                  {prodSeleccionado.publicado_web === false && prodSeleccionado.activo !== false && (
+                    <span className="erp-badge erp-badge--naranja">Solo SIGE Candy</span>
+                  )}
                   {prodSeleccionado.activo === false && (
                     <span className="erp-badge erp-badge--naranja">Dado de Baja</span>
                   )}
@@ -2890,6 +3187,12 @@ export default function CatalogoAdminPage() {
             </header>
 
             <div className="erp-drawer__body">
+              {esBolsaCelofanSistema && (
+                <div style={{ background: '#FFF9DE', border: '1px solid #F2E28A', borderRadius: 10, padding: '10px 12px', fontSize: 12, color: '#5F4B00', lineHeight: 1.45 }}>
+                  <b>Artículo vinculado al calculador de Aguinaldos (<code>fie-06</code>):</b> La tienda suma este producto automáticamente para las bolsitas vacías. Mantén sus piezas por paquete mayores a 0 y el producto publicado para no afectar el cálculo.
+                </div>
+              )}
+
               {prodSeleccionado.activo === false && (
                 <div className="erp-baja-confirm-box" style={{ background: '#FDECE8' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2912,7 +3215,7 @@ export default function CatalogoAdminPage() {
                     style={{ width: '100%' }}
                   >
                     <ErpIcon name="check" size={15} />
-                    <span>Volver a Publicar en la Tienda Web</span>
+                    <span>Reactivar Producto en Catálogo</span>
                   </button>
                 </div>
               )}
@@ -2949,10 +3252,10 @@ export default function CatalogoAdminPage() {
                 <div>
                   <label className="erp-label">Marca Comercial</label>
                   <ErpSelect
-                    value={prodSeleccionado.marca || 'Dulcerías Candy'}
+                    value={normalizarMarca(prodSeleccionado.marca)}
                     onChange={val => setProdSeleccionado({ ...prodSeleccionado, marca: val })}
                     searchPlaceholder="Buscar marca..."
-                    options={opcionesMarcaSimples}
+                    options={opcionesMarcaProducto}
                   />
                 </div>
                 <div>
@@ -2987,6 +3290,38 @@ export default function CatalogoAdminPage() {
                 />
               </div>
 
+              {/* CONFIGURACIÓN PARA AGUINALDOS Y DESTACADO WEB */}
+              <div style={{ background: '#F7F5FA', border: '1px solid var(--linea)', borderRadius: 12, padding: 14, display: 'grid', gap: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 12 }}>
+                  <div>
+                    <label className="erp-label">Piezas por paquete (Aguinaldos)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="erp-input"
+                      style={{ fontWeight: 700 }}
+                      value={prodSeleccionado.piezas_por_paquete ?? 0}
+                      onChange={e => setProdSeleccionado({ ...prodSeleccionado, piezas_por_paquete: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="erp-label">Destacado en Tienda Web</label>
+                    <ErpSelect
+                      value={prodSeleccionado.etiqueta_web || 'normal'}
+                      onChange={val => setProdSeleccionado({ ...prodSeleccionado, etiqueta_web: val })}
+                      options={OPCIONES_ETIQUETA_WEB}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11.5, color: costoPorPiezaInspector ? '#007A3B' : 'var(--texto-2)', fontWeight: 600 }}>
+                  {costoPorPiezaInspector
+                    ? `✓ Apto para modo Aguinaldos · Costo aprox. por pieza: $${costoPorPiezaInspector} MXN`
+                    : 'Con 0 piezas no aparecerá en el armador de Aguinaldos (solo catálogo y Piñata).'}
+                </div>
+              </div>
+
+              {/* POLÍTICA DE PRECIOS Y VIGENCIA */}
               <div style={{ background: '#FCF9FD', border: '1px solid #DEC8EA', borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--uva)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -3094,12 +3429,24 @@ export default function CatalogoAdminPage() {
               </div>
 
               <div>
+                <label className="erp-label">Visibilidad en Tienda Web</label>
+                <ErpSelect
+                  value={prodSeleccionado.publicado_web !== false ? 'web' : 'borrador'}
+                  onChange={val => setProdSeleccionado({ ...prodSeleccionado, publicado_web: val === 'web' })}
+                  options={[
+                    { value: 'web', label: 'Publicado — Visible para clientes en la tienda' },
+                    { value: 'borrador', label: 'Borrador — Solo visible en SIGE Candy (oculto en web)' }
+                  ]}
+                />
+              </div>
+
+              <div>
                 <label className="erp-label">Modalidad de Compra en Tienda Web</label>
                 <ErpSelect
                   value={prodSeleccionado.es_transaccional ? 'carrito' : 'cotizar'}
                   onChange={val => setProdSeleccionado({ ...prodSeleccionado, es_transaccional: val === 'carrito' })}
                   options={[
-                    { value: 'carrito', label: 'Venta directa en Carrito de Compras' },
+                    { value: 'carrito', label: 'Compra directa en línea (Checkout)' },
                     { value: 'cotizar', label: 'Bulto / Mayoreo — Solo Cotización por WhatsApp' }
                   ]}
                 />
@@ -3130,6 +3477,12 @@ export default function CatalogoAdminPage() {
                           Cancelar
                         </button>
                       </div>
+
+                      {esBolsaCelofanSistema && (
+                        <p style={{ margin: 0, fontSize: 12, color: '#C8320A', fontWeight: 600 }}>
+                          Atención: dar de baja <code>fie-06</code> quitará las bolsitas automáticas del modo Aguinaldos.
+                        </p>
+                      )}
 
                       <div>
                         <label className="erp-label">Motivo de la baja *</label>
@@ -3199,7 +3552,7 @@ export default function CatalogoAdminPage() {
         </div>
       )}
 
-      {/* MENSAJE FLOTANTE INFERIOR DE GUARDADO */}
+      {/* MENSAJE FLOTANTE INFERIOR */}
       {mensaje && (
         <div className={`erp-toast erp-toast--${mensaje.tipo} ${mensaje.saliendo ? 'saliendo' : ''}`}>
           <span className="erp-toast__icon">
