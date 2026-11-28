@@ -4,6 +4,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import {
+  MODULOS_AUDITORIA,
+  registrarAuditoria,
+  registrarInicioSesion,
+  registrarIntentoFallido
+} from '@/lib/erp/auditoria';
 import ErpIcon from '@/components/erp/ErpIcon';
 
 const ROLES_ERP_PERMITIDOS = [
@@ -136,11 +142,11 @@ export default function LoginErpPage() {
 
       setVista('validando_enlace');
 
-      // 1. Si llegan tokens en el hash (#access_token=...&refresh_token=...), ej. inviteUserByEmail o email_change
+      // 1. Si llegan tokens en el hash (#access_token=...&refresh_token=...)
       if (accessToken && refreshToken) {
         const { error: setSessErr } = await supabase.auth.setSession({
           access_token: accessToken,
-          refresh_token: refreshToken,
+          refresh_token: refreshToken
         });
 
         if (setSessErr) {
@@ -166,7 +172,7 @@ export default function LoginErpPage() {
         return;
       }
 
-      // 2. Si viene confirmación de cambio de correo sin tokens (confirmación directa en servidor)
+      // 2. Confirmación de cambio de correo sin tokens
       if (esCambioCorreo && !code) {
         localStorage.removeItem('candy_erp_sesion');
         await supabase.auth.signOut();
@@ -239,7 +245,7 @@ export default function LoginErpPage() {
 
     const cuentaDemo = CUENTAS_ROLES.find(c => c.correo.toLowerCase() === correoLimpio);
     if (cuentaDemo && password.length >= 4) {
-      entrarConPerfil(cuentaDemo);
+      await entrarConPerfil(cuentaDemo);
       return;
     }
 
@@ -250,13 +256,23 @@ export default function LoginErpPage() {
 
     if (authErr || !data?.user) {
       const msg = String(authErr?.message || '').toLowerCase();
+      let motivoAuditoria = 'Credenciales inválidas o cuenta no autorizada';
+
       if (msg.includes('email not confirmed')) {
+        motivoAuditoria = 'Cuenta pendiente de activación por correo';
         setError('Tu cuenta aún no ha sido activada. Revisa tu correo electrónico y haz clic en el enlace de activación.');
       } else if (msg.includes('banned')) {
+        motivoAuditoria = 'Cuenta suspendida o dada de baja';
         setError('Tu cuenta se encuentra inactiva o dada de baja. Contacta al Administrador de SIGE Candy.');
       } else {
         setError('Credenciales inválidas o cuenta no autorizada en el Nodo Central 2 Norte.');
       }
+
+      await registrarIntentoFallido(supabase, {
+        correo: correoLimpio,
+        motivo: motivoAuditoria
+      });
+
       setCargando(false);
       return;
     }
@@ -268,6 +284,10 @@ export default function LoginErpPage() {
       .single();
 
     if (perfilErr || !perfil || !ROLES_ERP_PERMITIDOS.includes(perfil.rol)) {
+      await registrarIntentoFallido(supabase, {
+        correo: correoLimpio,
+        motivo: 'Cuenta sin permisos de colaborador de SIGE Candy'
+      });
       await supabase.auth.signOut();
       setError('Acceso denegado: Esta cuenta no tiene permisos de colaborador de SIGE Candy.');
       setCargando(false);
@@ -275,13 +295,17 @@ export default function LoginErpPage() {
     }
 
     if (perfil.activo === false) {
+      await registrarIntentoFallido(supabase, {
+        correo: correoLimpio,
+        motivo: `Cuenta dada de baja (${perfil.nombre_completo || correoLimpio})`
+      });
       await supabase.auth.signOut();
       setError('Tu cuenta ha sido dada de baja. Contacta a Dirección / Administración.');
       setCargando(false);
       return;
     }
 
-    entrarConPerfil({
+    await entrarConPerfil({
       id_usuario: perfil.id_usuario,
       rol: perfil.rol,
       nombre: perfil.nombre_completo || data.user.email,
@@ -334,6 +358,7 @@ export default function LoginErpPage() {
 
     setCargando(true);
 
+    const { data: userData } = await supabase.auth.getUser();
     const { error: updateErr } = await supabase.auth.updateUser({
       password: nuevaPassword
     });
@@ -349,6 +374,25 @@ export default function LoginErpPage() {
       return;
     }
 
+    const correoUsuario = userData?.user?.email || 'Colaborador';
+    await registrarAuditoria(supabase, {
+      modulo: MODULOS_AUDITORIA.ACCESOS,
+      tipo_accion: 'GESTION_USUARIO',
+      id_referencia: userData?.user?.id || correoUsuario,
+      nombre_referencia: correoUsuario,
+      descripcion_cambio: esActivacionCuenta
+        ? 'Activó su cuenta y definió su contraseña personal en SIGE Candy'
+        : 'Restableció su contraseña mediante enlace seguro de recuperación',
+      valor_anterior: esActivacionCuenta ? 'Pendiente de activación' : 'Contraseña anterior',
+      valor_nuevo: esActivacionCuenta ? 'Cuenta activada' : 'Contraseña actualizada',
+      usuario: {
+        id_usuario: userData?.user?.id || null,
+        nombre: userData?.user?.user_metadata?.nombre_completo || correoUsuario,
+        correo: correoUsuario,
+        rol: 'colaborador'
+      }
+    });
+
     localStorage.removeItem('candy_erp_sesion');
     await supabase.auth.signOut();
 
@@ -358,8 +402,14 @@ export default function LoginErpPage() {
     setVista('password_actualizada');
   }
 
-  function entrarConPerfil(perfil) {
+  async function entrarConPerfil(perfil) {
+    setCargando(true);
     localStorage.setItem('candy_erp_sesion', JSON.stringify(perfil));
+
+    try {
+      await registrarInicioSesion(supabase, perfil);
+    } catch (_) {}
+
     router.push('/dashboard');
   }
 
@@ -416,6 +466,7 @@ export default function LoginErpPage() {
                 <button
                   key={c.rol}
                   type="button"
+                  disabled={cargando}
                   onClick={() => entrarConPerfil(c)}
                   className="erp-rol-btn"
                 >

@@ -4,17 +4,25 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { registrarCierreSesion } from '@/lib/erp/auditoria';
 import ErpIcon from '@/components/erp/ErpIcon';
 
-const MODULOS_FIJOS = [
+const MODULOS_OPERACION = [
   { href: '/dashboard', nombre: 'Panel Ejecutivo', icono: 'dashboard', roles: ['admin', 'almacen_2norte', 'cajero_sucursal', 'asesor_crm'] },
   { href: '/catalogo-admin', nombre: 'Catálogo y Precios', icono: 'tag', roles: ['admin'] },
   { href: '/almacen-peps', nombre: 'Almacén 2 Norte', icono: 'box', roles: ['admin', 'almacen_2norte'] },
   { href: '/surtido-picking', nombre: 'Surtido y Corte 4:30', icono: 'clipboard', roles: ['admin', 'almacen_2norte'] },
   { href: '/entrega-qr', nombre: 'Recepción y Entrega QR', icono: 'qrcode', roles: ['admin', 'cajero_sucursal'] },
-  { href: '/crm-cotizaciones', nombre: 'CRM y Garantías 24h', icono: 'users', roles: ['admin', 'asesor_crm'] },
+  { href: '/crm-cotizaciones', nombre: 'CRM y Garantías 24h', icono: 'users', roles: ['admin', 'asesor_crm'] }
+];
+
+const MODULOS_ADMIN = [
+  { href: '/metricas', nombre: 'Métricas', icono: 'dashboard', roles: ['admin'] },
+  { href: '/auditoria', nombre: 'Bitácora y Accesos', icono: 'lock', roles: ['admin'] },
   { href: '/usuarios-admin', nombre: 'Usuarios y Accesos', icono: 'shield', roles: ['admin'] }
 ];
+
+const TODOS_MODULOS_FIJOS = [...MODULOS_OPERACION, ...MODULOS_ADMIN];
 
 const ETIQUETA_ROL = {
   admin: 'Dirección / Administrador',
@@ -42,6 +50,7 @@ export default function ErpLayout({ children }) {
   const [horaPuebla, setHoraPuebla] = useState('');
   const [antesDeCorte, setAntesDeCorte] = useState(true);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
 
   const [nuevoModulo, setNuevoModulo] = useState({
     nombre_modulo: '',
@@ -70,7 +79,10 @@ export default function ErpLayout({ children }) {
   }, []);
 
   useEffect(() => {
-    if (pathname === '/login') return;
+    if (pathname === '/login') {
+      setCerrandoSesion(false);
+      return;
+    }
 
     const sesionGuardada = localStorage.getItem('candy_erp_sesion');
     if (!sesionGuardada) {
@@ -146,9 +158,19 @@ export default function ErpLayout({ children }) {
     }
   }
 
-  function cerrarSesion() {
+  async function cerrarSesion() {
+    if (cerrandoSesion) return;
+    setCerrandoSesion(true);
+
+    try {
+      if (usuario) {
+        await registrarCierreSesion(supabase, usuario);
+      }
+    } catch (_) {}
+
     localStorage.removeItem('candy_erp_sesion');
-    supabase.auth.signOut();
+    await supabase.auth.signOut();
+    setUsuario(null);
     router.push('/login');
   }
 
@@ -159,13 +181,16 @@ export default function ErpLayout({ children }) {
   if (!usuario) {
     return (
       <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--fondo)', fontSize: 13.5, color: 'var(--texto-2)' }}>
-        Cargando entorno corporativo Mini-ERP...
+        Cargando entorno corporativo SIGE Candy...
       </div>
     );
   }
 
-  const modulosPermitidos = MODULOS_FIJOS.filter(m => m.roles.includes(usuario.rol));
-  const moduloActual = MODULOS_FIJOS.find(m => m.href === pathname);
+  const modulosOperacionPermitidos = MODULOS_OPERACION.filter(m => m.roles.includes(usuario.rol));
+  const modulosAdminPermitidos = MODULOS_ADMIN.filter(m => m.roles.includes(usuario.rol));
+  const moduloFijoActual = TODOS_MODULOS_FIJOS.find(m => m.href === pathname);
+  const moduloDinamicoActual = modulosDinamicos.find(m => `/modulo/${m.slug}` === pathname);
+  const tituloActual = moduloFijoActual?.nombre || moduloDinamicoActual?.nombre_modulo || 'Módulo Operativo';
 
   return (
     <div className="erp-shell">
@@ -173,7 +198,7 @@ export default function ErpLayout({ children }) {
         <div className="erp-sidebar__brand">
           <img src="/img/LOGO CANDY.png" alt="Dulcerías Candy" onError={e => { e.currentTarget.src = '/img/ICONO.png'; }} />
           <div>
-            <span className="erp-sidebar__tag">ERP Corporativo</span>
+            <span className="erp-sidebar__tag">SIGE Candy</span>
             <p style={{ fontSize: 11.5, marginTop: 3, color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
               Sucursal 2 Norte
             </p>
@@ -182,7 +207,7 @@ export default function ErpLayout({ children }) {
 
         <p className="erp-nav__grupo">Operación Principal</p>
         <nav>
-          {modulosPermitidos.map(m => {
+          {modulosOperacionPermitidos.map(m => {
             const activo = pathname === m.href;
             return (
               <Link
@@ -196,6 +221,27 @@ export default function ErpLayout({ children }) {
             );
           })}
         </nav>
+
+        {modulosAdminPermitidos.length > 0 && (
+          <>
+            <p className="erp-nav__grupo">Administración</p>
+            <nav>
+              {modulosAdminPermitidos.map(m => {
+                const activo = pathname === m.href;
+                return (
+                  <Link
+                    key={m.href}
+                    href={m.href}
+                    className={`erp-nav__link ${activo ? 'erp-nav__link--activo' : ''}`}
+                  >
+                    <ErpIcon name={m.icono} size={17} />
+                    <span style={{ flex: 1 }}>{m.nombre}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </>
+        )}
 
         <p className="erp-nav__grupo">Áreas Personalizadas</p>
         <nav style={{ flex: 1 }}>
@@ -243,9 +289,14 @@ export default function ErpLayout({ children }) {
             <span style={{ flex: 1 }}>Tienda en Línea</span>
             <ErpIcon name="external" size={13} style={{ opacity: 0.6 }} />
           </a>
-          <button onClick={cerrarSesion} className="erp-nav__link" style={{ color: '#FF9494' }}>
+          <button
+            onClick={cerrarSesion}
+            disabled={cerrandoSesion}
+            className="erp-nav__link"
+            style={{ color: '#FF9494', opacity: cerrandoSesion ? 0.6 : 1 }}
+          >
             <ErpIcon name="logout" size={16} />
-            <span>Cerrar Sesión</span>
+            <span>{cerrandoSesion ? 'Cerrando sesión...' : 'Cerrar Sesión'}</span>
           </button>
         </div>
       </aside>
@@ -253,10 +304,10 @@ export default function ErpLayout({ children }) {
       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         <header className="erp-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            <span style={{ color: 'var(--tenue)', fontWeight: 500 }}>Sistema ERP</span>
+            <span style={{ color: 'var(--tenue)', fontWeight: 500 }}>SIGE Candy</span>
             <span style={{ color: 'var(--linea-2)' }}>/</span>
             <span style={{ fontWeight: 700, color: 'var(--texto)' }}>
-              {moduloActual ? moduloActual.nombre : 'Módulo Operativo'}
+              {tituloActual}
             </span>
           </div>
 
@@ -306,7 +357,7 @@ export default function ErpLayout({ children }) {
             <div className="erp-card__header">
               <div className="erp-card__title">
                 <ErpIcon name="plus" size={18} style={{ color: 'var(--marca)' }} />
-                <span>Registrar Nueva Área o Módulo en el ERP</span>
+                <span>Registrar Nueva Área o Módulo en SIGE Candy</span>
               </div>
               <button type="button" onClick={() => setModalAbierto(false)} className="cerrar">✕</button>
             </div>

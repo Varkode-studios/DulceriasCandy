@@ -50,7 +50,7 @@ const MARCAS_DISPONIBLES_BASE = [
 const OPCIONES_ETIQUETA_WEB = [
   { value: 'normal', label: 'Estándar (Sin etiqueta especial)' },
   { value: 'nuevo', label: 'Novedad (Sello "Nuevo" y filtro Novedades)' },
-  { value: 'top', label: 'Más vendido (Estante principal)' }
+  { value: 'top', label: 'Más vendido (Respaldo en estante principal)' }
 ];
 
 const MOTIVOS_BAJA = [
@@ -68,6 +68,7 @@ const ETIQUETA_TIPO_ACCION = {
   DESCUENTO_MASIVO: { texto: 'Descuento Masivo', clase: 'erp-badge--marca' },
   IMPORTACION_EXCEL: { texto: 'Importación Excel', clase: 'erp-badge--verde' },
   VISIBILIDAD_WEB: { texto: 'Visibilidad Web', clase: 'erp-badge--amarillo' },
+  ELIMINACION_BORRADOR: { texto: 'Borrador Eliminado', clase: 'erp-badge--naranja' },
   BAJA_LOGICA: { texto: 'Baja de Catálogo', clase: 'erp-badge--naranja' },
   REACTIVACION: { texto: 'Republicación', clase: 'erp-badge--verde' },
   EDICION_BANNER: { texto: 'Banner Portada', clase: 'erp-badge--amarillo' },
@@ -87,6 +88,14 @@ function normalizarMarca(valor) {
 function marcaParaDB(valor) {
   const m = normalizarMarca(valor);
   return m === SIN_MARCA ? null : m;
+}
+
+function tieneFotoReal(prod) {
+  const url = String(prod?.imagen_url || '').trim();
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  if (lower === 'img/icono.png' || lower === '/img/icono.png') return false;
+  return true;
 }
 
 function descomponerLeyendaBanner(leyenda = '', urlImg = '') {
@@ -207,7 +216,7 @@ export default function CatalogoAdminPage() {
     rol: 'admin'
   });
 
-  const [tab, setTab] = useState('productos');
+  const [tab, setTab] = useState('productos'); // 'productos' | 'borradores' | 'bajas' | 'banners' | 'auditoria'
   const [modoVista, setModoVista] = useState('categorias');
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -216,7 +225,7 @@ export default function CatalogoAdminPage() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState(null);
 
-  // Filtros de productos activos
+  // Filtros de productos publicados en Tienda Web
   const [busqueda, setBusqueda] = useState('');
   const [filtroCat, setFiltroCat] = useState('todas');
   const [filtroMarca, setFiltroMarca] = useState('todas');
@@ -226,6 +235,20 @@ export default function CatalogoAdminPage() {
   const [paginaActual, setPaginaActual] = useState(1);
   const [porPagina, setPorPagina] = useState(24);
   const [categoriasExpandidas, setCategoriasExpandidas] = useState({});
+
+  // Estado y filtros de pestaña Borradores
+  const [busquedaBorradores, setBusquedaBorradores] = useState('');
+  const [filtroCatBorradores, setFiltroCatBorradores] = useState('todas');
+  const [filtroCalidadBorradores, setFiltroCalidadBorradores] = useState('todos'); // 'todos' | 'listos' | 'con_foto' | 'sin_foto' | 'sin_stock'
+  const [paginaBorradores, setPaginaBorradores] = useState(1);
+  const [porPaginaBorradores, setPorPaginaBorradores] = useState(24);
+  const [seleccionBorradores, setSeleccionBorradores] = useState([]);
+  const [subiendoFotoId, setSubiendoFotoId] = useState(null);
+  const [dragOverBorradorId, setDragOverBorradorId] = useState(null);
+  const [publicandoMasivo, setPublicandoMasivo] = useState(false);
+  const [confirmandoEliminarBorradores, setConfirmandoEliminarBorradores] = useState(false);
+  const [eliminandoBorradores, setEliminandoBorradores] = useState(false);
+  const [prodPreviewWeb, setProdPreviewWeb] = useState(null);
 
   // Filtros de productos dados de baja
   const [busquedaBajas, setBusquedaBajas] = useState('');
@@ -252,7 +275,6 @@ export default function CatalogoAdminPage() {
     fecha_fin: ''
   });
   const [aplicandoDescuento, setAplicandoDescuento] = useState(false);
-  const [publicandoMasivo, setPublicandoMasivo] = useState(false);
 
   // Inspector lateral de producto
   const [prodSeleccionado, setProdSeleccionado] = useState(null);
@@ -280,10 +302,10 @@ export default function CatalogoAdminPage() {
     descuento_inicio: '',
     descuento_fin: '',
     tope_maximo_compra: 20,
-    stock_web: 25,
+    stock_web: 0,
     es_transaccional: true,
-    publicado_web: true,
-    imagen_url: 'img/Gomita.png'
+    publicado_web: false,
+    imagen_url: ''
   });
 
   const [nuevoBanner, setNuevoBanner] = useState({
@@ -313,7 +335,11 @@ export default function CatalogoAdminPage() {
   }, [busqueda, filtroCat, filtroMarca, filtroStock, filtroOferta, ordenPor, porPagina]);
 
   useEffect(() => {
-    if (prodSeleccionado) {
+    setPaginaBorradores(1);
+  }, [busquedaBorradores, filtroCatBorradores, filtroCalidadBorradores, porPaginaBorradores]);
+
+  useEffect(() => {
+    if (prodSeleccionado || prodPreviewWeb) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -321,7 +347,7 @@ export default function CatalogoAdminPage() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [prodSeleccionado]);
+  }, [prodSeleccionado, prodPreviewWeb]);
 
   function previsualizarBannerArriba(idBanner) {
     setBannerEnSimulador(idBanner);
@@ -443,7 +469,13 @@ export default function CatalogoAdminPage() {
         setDescMasivo(prev => ({ ...prev, id_categoria: String(cats[0].id_categoria) }));
       }
     }
-    if (prods) setProductos(prods);
+    if (prods) {
+      setProductos(prods);
+      const idsBorradoresVigentes = new Set(
+        prods.filter(p => p.activo !== false && p.publicado_web === false).map(p => p.id_producto)
+      );
+      setSeleccionBorradores(prev => prev.filter(id => idsBorradoresVigentes.has(id)));
+    }
     if (bans) {
       setBanners(bans);
       if (bans.length > 0 && bannerEnSimulador === null) {
@@ -464,10 +496,12 @@ export default function CatalogoAdminPage() {
     }, 3200);
   }
 
-  const productosActivos = productos.filter(p => p.activo !== false);
+  // Segmentación limpia del catálogo
+  const productosPublicados = productos.filter(p => p.activo !== false && p.publicado_web !== false);
+  const productosBorradores = productos.filter(p => p.activo !== false && p.publicado_web === false);
   const productosInactivos = productos.filter(p => p.activo === false);
 
-  // Marcas comerciales (incluye Dulcerías Candy y marcas registradas en BD)
+  // Marcas comerciales
   const marcasComerciales = useMemo(() => {
     const limpias = productos
       .map(p => normalizarMarca(p.marca))
@@ -478,7 +512,7 @@ export default function CatalogoAdminPage() {
     );
   }, [productos]);
 
-  // Destinos de banners generados dinámicamente con categorías y marcas reales + Aguinaldos
+  // Destinos de banners dinámicos
   const destinosBanner = useMemo(() => {
     const base = [
       { valor: '#oferta', etiqueta: 'Promoción: Productos con descuento activo (Buen Fin / Ofertas)' },
@@ -536,7 +570,8 @@ export default function CatalogoAdminPage() {
     };
   };
 
-  const productosFiltrados = productosActivos
+  /* ─────────── FILTRADO DE PRODUCTOS EN TIENDA WEB ─────────── */
+  const productosFiltrados = productosPublicados
     .filter(p => {
       if (filtroCat !== 'todas' && String(p.id_categoria) !== String(filtroCat)) return false;
 
@@ -559,8 +594,6 @@ export default function CatalogoAdminPage() {
       if (filtroOferta === 'sin_piezas' && piezas > 0) return false;
       if (filtroOferta === 'top' && p.etiqueta_web !== 'top') return false;
       if (filtroOferta === 'nuevo' && p.etiqueta_web !== 'nuevo') return false;
-      if (filtroOferta === 'solo_erp' && p.publicado_web !== false) return false;
-      if (filtroOferta === 'publicados_web' && p.publicado_web === false) return false;
 
       if (busqueda.trim()) {
         const texto = `${p.codigo_barras} ${p.nombre_dulce} ${marcaNorm} ${p.presentacion || ''}`.toLowerCase();
@@ -576,9 +609,6 @@ export default function CatalogoAdminPage() {
       if (ordenPor === 'descuento_desc') return Number(b.porcentaje_descuento || 0) - Number(a.porcentaje_descuento || 0);
       return Number(a.id_categoria) - Number(b.id_categoria) || a.id_producto - b.id_producto;
     });
-
-  const borradoresEnFiltro = productosFiltrados.filter(p => p.publicado_web === false);
-  const totalBorradoresActivos = productosActivos.filter(p => p.publicado_web === false).length;
 
   const totalPaginas = Math.max(1, Math.ceil(productosFiltrados.length / porPagina));
   const pagSegura = Math.min(paginaActual, totalPaginas);
@@ -602,14 +632,231 @@ export default function CatalogoAdminPage() {
     setPaginaActual(1);
   }
 
+  /* ─────────── FILTRADO Y MÉTRICAS DE BORRADORES ─────────── */
+  const resumenBorradores = useMemo(() => {
+    let listos = 0;
+    let conFoto = 0;
+    let sinFoto = 0;
+    let sinStock = 0;
+
+    productosBorradores.forEach(p => {
+      const foto = tieneFotoReal(p);
+      const stock = Number(p.stock_web || 0) > 0;
+      if (foto) conFoto++;
+      else sinFoto++;
+      if (!stock) sinStock++;
+      if (foto && stock) listos++;
+    });
+
+    return { listos, conFoto, sinFoto, sinStock };
+  }, [productosBorradores]);
+
+  const borradoresFiltrados = productosBorradores
+    .filter(p => {
+      if (filtroCatBorradores !== 'todas' && String(p.id_categoria) !== String(filtroCatBorradores)) return false;
+
+      const foto = tieneFotoReal(p);
+      const stock = Number(p.stock_web || 0) > 0;
+
+      if (filtroCalidadBorradores === 'listos' && !(foto && stock)) return false;
+      if (filtroCalidadBorradores === 'con_foto' && !foto) return false;
+      if (filtroCalidadBorradores === 'sin_foto' && foto) return false;
+      if (filtroCalidadBorradores === 'sin_stock' && stock) return false;
+
+      if (busquedaBorradores.trim()) {
+        const marcaNorm = normalizarMarca(p.marca);
+        const txt = `${p.codigo_barras} ${p.nombre_dulce} ${marcaNorm} ${p.presentacion || ''}`.toLowerCase();
+        if (!txt.includes(busquedaBorradores.trim().toLowerCase())) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => b.id_producto - a.id_producto);
+
+  const totalPagBorradores = Math.max(1, Math.ceil(borradoresFiltrados.length / porPaginaBorradores));
+  const pagBorrSegura = Math.min(paginaBorradores, totalPagBorradores);
+  const inicioBorradores = (pagBorrSegura - 1) * porPaginaBorradores;
+  const borradoresPaginados = borradoresFiltrados.slice(inicioBorradores, inicioBorradores + porPaginaBorradores);
+
+  function toggleSeleccionBorrador(idProducto) {
+    setConfirmandoEliminarBorradores(false);
+    setSeleccionBorradores(prev =>
+      prev.includes(idProducto) ? prev.filter(x => x !== idProducto) : [...prev, idProducto]
+    );
+  }
+
+  function seleccionarGrupoBorradores(tipo) {
+    setConfirmandoEliminarBorradores(false);
+    if (tipo === 'ninguno') {
+      setSeleccionBorradores([]);
+      return;
+    }
+    if (tipo === 'todos_filtrados') {
+      setSeleccionBorradores(borradoresFiltrados.map(p => p.id_producto));
+      return;
+    }
+    if (tipo === 'con_foto') {
+      const ids = borradoresFiltrados.filter(p => tieneFotoReal(p)).map(p => p.id_producto);
+      setSeleccionBorradores(ids);
+      if (ids.length === 0) notificar('Ningún borrador filtrado tiene fotografía todavía', 'error');
+      return;
+    }
+    if (tipo === 'listos') {
+      const ids = borradoresFiltrados
+        .filter(p => tieneFotoReal(p) && Number(p.stock_web || 0) > 0)
+        .map(p => p.id_producto);
+      setSeleccionBorradores(ids);
+      if (ids.length === 0) notificar('Aún no hay borradores con foto y stock PEPS mayor a 0', 'error');
+    }
+  }
+
+  async function publicarBorradores(listaProductos) {
+    if (!listaProductos || listaProductos.length === 0) return;
+
+    setPublicandoMasivo(true);
+    const ids = listaProductos.map(p => p.id_producto);
+    const ahoraIso = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('tbl_productos')
+      .update({
+        publicado_web: true,
+        ultima_modificacion_por: usuarioActual.nombre,
+        fecha_ultima_modificacion: ahoraIso
+      })
+      .in('id_producto', ids);
+
+    setPublicandoMasivo(false);
+
+    if (error) {
+      notificar('Error al publicar en Tienda Web: ' + error.message, 'error');
+      return;
+    }
+
+    const esUno = listaProductos.length === 1;
+    await registrarEnBitacora({
+      tipo_accion: 'VISIBILIDAD_WEB',
+      id_referencia: esUno ? (listaProductos[0].codigo_barras || listaProductos[0].id_producto) : 'lote_borradores',
+      nombre_referencia: esUno ? listaProductos[0].nombre_dulce : `${ids.length} productos publicados`,
+      descripcion_cambio: esUno
+        ? `Publicó "${listaProductos[0].nombre_dulce}" desde Borradores hacia la Tienda Web`
+        : `Publicó en la Tienda Web ${ids.length} productos desde la bandeja de Borradores`,
+      valor_anterior: 'Borrador (Solo SIGE Candy)',
+      valor_nuevo: 'Publicado en Tienda Web'
+    });
+
+    setSeleccionBorradores(prev => prev.filter(id => !ids.includes(id)));
+    if (prodPreviewWeb && ids.includes(prodPreviewWeb.id_producto)) {
+      setProdPreviewWeb(null);
+    }
+
+    notificar(
+      esUno
+        ? `"${listaProductos[0].nombre_dulce}" ya está visible en la tienda en línea`
+        : `${ids.length} productos publicados en la tienda en línea`
+    );
+    cargarDatos();
+  }
+
+  async function eliminarBorradoresSeleccionados() {
+    if (seleccionBorradores.length === 0) return;
+
+    setEliminandoBorradores(true);
+    const ids = [...seleccionBorradores];
+    const nombresRef = productosBorradores
+      .filter(p => ids.includes(p.id_producto))
+      .slice(0, 3)
+      .map(p => p.nombre_dulce)
+      .join(', ');
+
+    const { error } = await supabase
+      .from('tbl_productos')
+      .delete()
+      .in('id_producto', ids)
+      .eq('publicado_web', false);
+
+    setEliminandoBorradores(false);
+    setConfirmandoEliminarBorradores(false);
+
+    if (error) {
+      notificar(
+        'No se pudieron eliminar algunos borradores porque ya tienen historial en almacén o pedidos. Usa "Dar de baja" en su lugar.',
+        'error'
+      );
+      return;
+    }
+
+    await registrarEnBitacora({
+      tipo_accion: 'ELIMINACION_BORRADOR',
+      id_referencia: 'borradores',
+      nombre_referencia: `${ids.length} borrador(es) eliminados`,
+      descripcion_cambio: `Eliminó ${ids.length} producto(s) sin publicar desde Borradores (${nombresRef}${ids.length > 3 ? '...' : ''})`,
+      valor_anterior: 'Borrador (Solo SIGE Candy)',
+      valor_nuevo: 'Eliminado'
+    });
+
+    setSeleccionBorradores([]);
+    notificar(`${ids.length} borrador(es) eliminados correctamente`);
+    cargarDatos();
+  }
+
+  async function subirFotoRapidaBorrador(archivo, prod) {
+    if (!archivo || !prod) return;
+    setSubiendoFotoId(prod.id_producto);
+
+    try {
+      const urlPublica = await subirArchivoStorageConRespaldo(archivo, 'productos');
+      const ahoraIso = new Date().toISOString();
+
+      const { error } = await supabase
+        .from('tbl_productos')
+        .update({
+          imagen_url: urlPublica,
+          ultima_modificacion_por: usuarioActual.nombre,
+          fecha_ultima_modificacion: ahoraIso
+        })
+        .eq('id_producto', prod.id_producto);
+
+      if (error) throw new Error(error.message);
+
+      setProductos(prev =>
+        prev.map(item =>
+          item.id_producto === prod.id_producto
+            ? {
+                ...item,
+                imagen_url: urlPublica,
+                ultima_modificacion_por: usuarioActual.nombre,
+                fecha_ultima_modificacion: ahoraIso
+              }
+            : item
+        )
+      );
+
+      await registrarEnBitacora({
+        tipo_accion: 'EDICION_PRECIO_DATOS',
+        id_referencia: prod.codigo_barras || prod.id_producto,
+        nombre_referencia: prod.nombre_dulce,
+        descripcion_cambio: 'Subió fotografía rápida desde la bandeja de Borradores',
+        valor_anterior: prod.imagen_url ? 'Fotografía previa' : 'Sin fotografía',
+        valor_nuevo: 'Fotografía cargada'
+      });
+
+      notificar(`Foto guardada en "${prod.nombre_dulce}"`);
+    } catch (err) {
+      notificar('Error al subir foto: ' + err.message, 'error');
+    } finally {
+      setSubiendoFotoId(null);
+    }
+  }
+
+  /* ─────────── DESCUENTOS MASIVOS ─────────── */
   const obtenerProductosObjetivoDescuento = () => {
-    if (descMasivo.alcance === 'todos') return productosActivos;
+    if (descMasivo.alcance === 'todos') return productosPublicados;
     if (descMasivo.alcance === 'filtrados') return productosFiltrados;
     if (descMasivo.alcance === 'categoria') {
-      return productosActivos.filter(p => String(p.id_categoria) === String(descMasivo.id_categoria));
+      return productosPublicados.filter(p => String(p.id_categoria) === String(descMasivo.id_categoria));
     }
     if (descMasivo.alcance === 'marca') {
-      return productosActivos.filter(p => normalizarMarca(p.marca).toLowerCase() === descMasivo.marca.toLowerCase());
+      return productosPublicados.filter(p => normalizarMarca(p.marca).toLowerCase() === descMasivo.marca.toLowerCase());
     }
     return [];
   };
@@ -622,7 +869,7 @@ export default function CatalogoAdminPage() {
       : Math.max(0, Math.min(90, Number(descMasivo.porcentaje || 0)));
 
     if (productosObjetivo.length === 0) {
-      notificar('No hay productos activos dentro del criterio seleccionado', 'error');
+      notificar('No hay productos publicados dentro del criterio seleccionado', 'error');
       return;
     }
 
@@ -658,7 +905,7 @@ export default function CatalogoAdminPage() {
     if (error) {
       notificar('Error al aplicar descuento: ' + error.message, 'error');
     } else {
-      let etiquetaGrupo = 'Todo el catálogo activo';
+      let etiquetaGrupo = 'Todo el catálogo publicado';
       if (descMasivo.alcance === 'categoria') {
         const c = categorias.find(x => String(x.id_categoria) === String(descMasivo.id_categoria));
         etiquetaGrupo = `Categoría ${c?.nombre_categoria || ''}`;
@@ -702,40 +949,7 @@ export default function CatalogoAdminPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  async function publicarBorradoresFiltrados() {
-    if (borradoresEnFiltro.length === 0) return;
-
-    setPublicandoMasivo(true);
-    const ids = borradoresEnFiltro.map(p => p.id_producto);
-    const ahoraIso = new Date().toISOString();
-
-    const { error } = await supabase
-      .from('tbl_productos')
-      .update({
-        publicado_web: true,
-        ultima_modificacion_por: usuarioActual.nombre,
-        fecha_ultima_modificacion: ahoraIso
-      })
-      .in('id_producto', ids);
-
-    setPublicandoMasivo(false);
-
-    if (error) {
-      notificar('Error al publicar borradores: ' + error.message, 'error');
-    } else {
-      await registrarEnBitacora({
-        tipo_accion: 'VISIBILIDAD_WEB',
-        id_referencia: 'masivo',
-        nombre_referencia: `${ids.length} productos publicados`,
-        descripcion_cambio: `Publicó en la tienda web ${ids.length} productos que estaban como Borrador (Solo SIGE Candy)`,
-        valor_anterior: 'Solo SIGE Candy (Borrador)',
-        valor_nuevo: 'Publicado en Tienda Web'
-      });
-      notificar(`${ids.length} productos publicados en la tienda en línea`);
-      cargarDatos();
-    }
-  }
-
+  /* ─────────── GUARDAR / BAJA / REACTIVAR / CREAR PRODUCTO ─────────── */
   async function guardarCambiosProducto(prod) {
     setGuardandoDetalle(true);
     const original = productos.find(item => item.id_producto === prod.id_producto) || {};
@@ -784,8 +998,8 @@ export default function CatalogoAdminPage() {
     }
     if (publicadoOriginal !== publicadoNuevo) {
       cambiosDetectados.push('Visibilidad en tienda web');
-      valoresAntes.push(publicadoOriginal ? 'Publicado en web' : 'Solo SIGE Candy');
-      valoresNuevos.push(publicadoNuevo ? 'Publicado en web' : 'Solo SIGE Candy');
+      valoresAntes.push(publicadoOriginal ? 'Publicado en web' : 'Borrador (Solo SIGE)');
+      valoresNuevos.push(publicadoNuevo ? 'Publicado en web' : 'Borrador (Solo SIGE)');
     }
     if (Number(original.stock_web || 0) !== Number(prod.stock_web || 0)) {
       cambiosDetectados.push('Existencia web');
@@ -841,7 +1055,7 @@ export default function CatalogoAdminPage() {
         tope_maximo_compra: Number(prod.tope_maximo_compra || 20),
         stock_web: Number(prod.stock_web || 0),
         es_transaccional: prod.es_transaccional,
-        imagen_url: prod.imagen_url,
+        imagen_url: prod.imagen_url || null,
         ultima_modificacion_por: usuarioActual.nombre,
         fecha_ultima_modificacion: ahoraIso
       })
@@ -903,7 +1117,7 @@ export default function CatalogoAdminPage() {
         id_referencia: prod.codigo_barras || prod.id_producto,
         nombre_referencia: prod.nombre_dulce,
         descripcion_cambio: `Dio de baja del catálogo por: ${datosBaja.motivo}${datosBaja.comentario ? ` (${datosBaja.comentario.trim()})` : ''}`,
-        valor_anterior: 'Estado: Activo',
+        valor_anterior: prod.publicado_web === false ? 'Estado: Borrador' : 'Estado: En Tienda Web',
         valor_nuevo: `Baja (${datosBaja.motivo})`
       });
 
@@ -936,12 +1150,16 @@ export default function CatalogoAdminPage() {
         tipo_accion: 'REACTIVACION',
         id_referencia: prod.codigo_barras || prod.id_producto,
         nombre_referencia: prod.nombre_dulce,
-        descripcion_cambio: `Reactivó el producto en el catálogo activo (Precio: $${Number(prod.precio_unitario).toFixed(2)})`,
+        descripcion_cambio: `Reactivó el producto (Precio: $${Number(prod.precio_unitario).toFixed(2)})`,
         valor_anterior: `Inactivo (${prod.motivo_baja || 'Archivado'})`,
-        valor_nuevo: prod.publicado_web === false ? 'Activo (Solo SIGE Candy)' : 'Activo en Tienda Web'
+        valor_nuevo: prod.publicado_web === false ? 'Activo en Borradores' : 'Activo en Tienda Web'
       });
 
-      notificar(`"${prod.nombre_dulce}" fue reactivado correctamente`);
+      notificar(
+        prod.publicado_web === false
+          ? `"${prod.nombre_dulce}" regresó a Borradores`
+          : `"${prod.nombre_dulce}" fue reactivado en Tienda Web`
+      );
       if (desdeDrawer) cerrarInspector();
       cargarDatos();
     }
@@ -1013,7 +1231,7 @@ export default function CatalogoAdminPage() {
       tope_maximo_compra: Number(nuevoProd.tope_maximo_compra),
       stock_web: Number(nuevoProd.stock_web),
       es_transaccional: nuevoProd.es_transaccional,
-      imagen_url: nuevoProd.imagen_url,
+      imagen_url: nuevoProd.imagen_url || null,
       activo: true,
       ultima_modificacion_por: usuarioActual.nombre,
       fecha_ultima_modificacion: ahoraIso
@@ -1026,12 +1244,16 @@ export default function CatalogoAdminPage() {
         tipo_accion: 'ALTA_PRODUCTO',
         id_referencia: nuevoProd.codigo_barras,
         nombre_referencia: nuevoProd.nombre_dulce,
-        descripcion_cambio: `Registró nuevo producto (${normalizarMarca(nuevoProd.marca)} · ${nuevoProd.presentacion}${piezasNum > 0 ? ` · ${piezasNum} pzas/paq` : ''}${publicadoWeb ? '' : ' · Borrador Solo SIGE Candy'})`,
+        descripcion_cambio: `Registró nuevo producto (${normalizarMarca(nuevoProd.marca)} · ${nuevoProd.presentacion}${piezasNum > 0 ? ` · ${piezasNum} pzas/paq` : ''}${publicadoWeb ? ' · Publicado en web' : ' · Borrador Solo SIGE Candy'})`,
         valor_anterior: 'Nuevo registro',
         valor_nuevo: `Precio: $${precioUnit.toFixed(2)} · Stock: ${nuevoProd.stock_web}`
       });
 
-      notificar(`Producto "${nuevoProd.nombre_dulce}" agregado al catálogo`);
+      notificar(
+        publicadoWeb
+          ? `Producto "${nuevoProd.nombre_dulce}" publicado en la Tienda Web`
+          : `Producto "${nuevoProd.nombre_dulce}" guardado en Borradores`
+      );
       setPanelAbierto(null);
       setNuevoProd({
         codigo_barras: '',
@@ -1047,15 +1269,16 @@ export default function CatalogoAdminPage() {
         descuento_inicio: '',
         descuento_fin: '',
         tope_maximo_compra: 20,
-        stock_web: 25,
+        stock_web: 0,
         es_transaccional: true,
-        publicado_web: true,
-        imagen_url: 'img/Gomita.png'
+        publicado_web: false,
+        imagen_url: ''
       });
       cargarDatos();
     }
   }
 
+  /* ─────────── BANNERS ─────────── */
   function seleccionarFondoBannerLocal(archivo, idPromocion = null) {
     if (!archivo) return;
 
@@ -1245,20 +1468,29 @@ export default function CatalogoAdminPage() {
     cargarDatos();
   }
 
-  // Opciones preparadas para ErpSelect
+  /* ─────────── OPCIONES PARA ErpSelect ─────────── */
   const opcionesCatConTodas = [
-    { value: 'todas', label: `Todas (${categorias.length})`, badge: productosActivos.length },
+    { value: 'todas', label: `Todas (${categorias.length})`, badge: productosPublicados.length },
     ...categorias.map(c => ({
       value: String(c.id_categoria),
       label: c.nombre_categoria,
-      badge: productosActivos.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
+      badge: productosPublicados.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
+    }))
+  ];
+
+  const opcionesCatBorradores = [
+    { value: 'todas', label: `Todas (${categorias.length})`, badge: productosBorradores.length },
+    ...categorias.map(c => ({
+      value: String(c.id_categoria),
+      label: c.nombre_categoria,
+      badge: productosBorradores.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
     }))
   ];
 
   const opcionesCatSimples = categorias.map(c => ({
     value: String(c.id_categoria),
     label: c.nombre_categoria,
-    badge: productosActivos.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
+    badge: productosPublicados.filter(p => Number(p.id_categoria) === Number(c.id_categoria)).length
   }));
 
   const opcionesMarcaConTodas = [
@@ -1266,12 +1498,12 @@ export default function CatalogoAdminPage() {
     ...marcasComerciales.map(m => ({
       value: m,
       label: m,
-      badge: productosActivos.filter(p => normalizarMarca(p.marca).toLowerCase() === m.toLowerCase()).length
+      badge: productosPublicados.filter(p => normalizarMarca(p.marca).toLowerCase() === m.toLowerCase()).length
     })),
     {
       value: SIN_MARCA,
       label: SIN_MARCA,
-      badge: productosActivos.filter(p => normalizarMarca(p.marca) === SIN_MARCA).length
+      badge: productosPublicados.filter(p => normalizarMarca(p.marca) === SIN_MARCA).length
     }
   ];
 
@@ -1279,15 +1511,16 @@ export default function CatalogoAdminPage() {
     ...marcasComerciales.map(m => ({
       value: m,
       label: m,
-      badge: productosActivos.filter(p => normalizarMarca(p.marca).toLowerCase() === m.toLowerCase()).length
+      badge: productosPublicados.filter(p => normalizarMarca(p.marca).toLowerCase() === m.toLowerCase()).length
     })),
     {
       value: SIN_MARCA,
       label: SIN_MARCA,
-      badge: productosActivos.filter(p => normalizarMarca(p.marca) === SIN_MARCA).length
+      badge: productosPublicados.filter(p => normalizarMarca(p.marca) === SIN_MARCA).length
     }
   ];
 
+  /* ─────────── RENDER DE TARJETAS DE PRODUCTOS PUBLICADOS ─────────── */
   function renderTarjetaProductoCompacta(p) {
     const vig = evaluarVigenciaDescuento(p);
     const precioBase = Number(p.precio_unitario || 0);
@@ -1321,11 +1554,6 @@ export default function CatalogoAdminPage() {
                 <span>·</span>
                 <span style={{ fontWeight: 600, color: 'var(--uva)' }}>{marcaTxt}</span>
               </>
-            )}
-            {p.publicado_web === false && (
-              <span className="erp-badge erp-badge--naranja" style={{ fontSize: 9.5, padding: '1px 6px' }}>
-                Solo SIGE
-              </span>
             )}
             {p.etiqueta_web === 'top' && (
               <span className="erp-badge erp-badge--amarillo" style={{ fontSize: 9.5, padding: '1px 6px' }}>Top</span>
@@ -1417,11 +1645,6 @@ export default function CatalogoAdminPage() {
                   {marcaTxt}
                 </span>
               )}
-              {p.publicado_web === false && (
-                <span className="erp-badge erp-badge--naranja" style={{ fontSize: 10, padding: '2px 7px' }}>
-                  Solo SIGE
-                </span>
-              )}
               {p.etiqueta_web === 'top' && (
                 <span className="erp-badge erp-badge--marca" style={{ fontSize: 10, padding: '2px 7px' }}>Más vendido</span>
               )}
@@ -1463,9 +1686,7 @@ export default function CatalogoAdminPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, borderTop: '1px solid var(--linea)' }}>
           <span style={{ fontSize: 11.5, color: 'var(--texto-2)', fontWeight: 600 }}>
-            {p.publicado_web === false
-              ? 'Oculto en tienda web (Borrador)'
-              : p.descuento_fin && vig.activoEnTienda
+            {p.descuento_fin && vig.activoEnTienda
               ? `Vence: ${isoAFechaInput(p.descuento_fin)} 23:59`
               : p.es_transaccional
               ? 'Compra en línea'
@@ -1480,13 +1701,14 @@ export default function CatalogoAdminPage() {
     );
   }
 
-  function renderPaginacion() {
-    if (productosFiltrados.length <= porPagina) return null;
+  function renderPaginacionGenerica(totalItems, pagActual, totalPags, itemsPorPag, setPag, setItemsPorPag) {
+    if (totalItems <= itemsPorPag) return null;
+    const inicio = (pagActual - 1) * itemsPorPag;
 
     return (
       <div className="erp-pagination">
         <span style={{ fontSize: 12.5, color: 'var(--texto-2)' }}>
-          Mostrando <b>{indiceInicio + 1}</b> – <b>{Math.min(indiceInicio + porPagina, productosFiltrados.length)}</b> de <b>{productosFiltrados.length}</b> productos
+          Mostrando <b>{inicio + 1}</b> – <b>{Math.min(inicio + itemsPorPag, totalItems)}</b> de <b>{totalItems}</b> productos
         </span>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -1496,8 +1718,8 @@ export default function CatalogoAdminPage() {
               <ErpSelect
                 compact
                 searchable={false}
-                value={String(porPagina)}
-                onChange={val => setPorPagina(Number(val))}
+                value={String(itemsPorPag)}
+                onChange={val => setItemsPorPag(Number(val))}
                 options={[
                   { value: '24', label: '24' },
                   { value: '48', label: '48' },
@@ -1510,28 +1732,28 @@ export default function CatalogoAdminPage() {
           <div className="erp-pagination__btns">
             <button
               type="button"
-              disabled={pagSegura === 1}
-              onClick={() => setPaginaActual(pagSegura - 1)}
+              disabled={pagActual === 1}
+              onClick={() => setPag(pagActual - 1)}
               className="erp-page-btn"
             >
               Anterior
             </button>
-            {Array.from({ length: totalPaginas }, (_, i) => i + 1)
-              .filter(n => n === 1 || n === totalPaginas || Math.abs(n - pagSegura) <= 1)
+            {Array.from({ length: totalPags }, (_, i) => i + 1)
+              .filter(n => n === 1 || n === totalPags || Math.abs(n - pagActual) <= 1)
               .map(n => (
                 <button
                   key={n}
                   type="button"
-                  onClick={() => setPaginaActual(n)}
-                  className={`erp-page-btn ${n === pagSegura ? 'activo' : ''}`}
+                  onClick={() => setPag(n)}
+                  className={`erp-page-btn ${n === pagActual ? 'activo' : ''}`}
                 >
                   {n}
                 </button>
               ))}
             <button
               type="button"
-              disabled={pagSegura === totalPaginas}
-              onClick={() => setPaginaActual(pagSegura + 1)}
+              disabled={pagActual === totalPags}
+              onClick={() => setPag(pagActual + 1)}
               className="erp-page-btn"
             >
               Siguiente
@@ -1547,8 +1769,7 @@ export default function CatalogoAdminPage() {
       const items = productosFiltrados.filter(p => Number(p.id_categoria) === Number(cat.id_categoria));
       const conDescuento = items.filter(i => evaluarVigenciaDescuento(i).activoEnTienda).length;
       const agotados = items.filter(i => Number(i.stock_web) <= 0).length;
-      const borradores = items.filter(i => i.publicado_web === false).length;
-      return { ...cat, items, conDescuento, agotados, borradores };
+      return { ...cat, items, conDescuento, agotados };
     })
     .filter(g => g.items.length > 0);
 
@@ -1614,7 +1835,6 @@ export default function CatalogoAdminPage() {
 
   const datosPreview = obtenerDatosSimuladorBanner();
 
-  // Cálculo en vivo para costo por pieza en el inspector (Aguinaldos)
   const esBolsaCelofanSistema =
     prodSeleccionado && String(prodSeleccionado.codigo_barras || '').toLowerCase() === 'fie-06';
 
@@ -1625,6 +1845,10 @@ export default function CatalogoAdminPage() {
       ? (Number(prodSeleccionado.precio_unitario) / Number(prodSeleccionado.piezas_por_paquete)).toFixed(2)
       : null;
 
+  const borradoresSeleccionadosObjs = productosBorradores.filter(p =>
+    seleccionBorradores.includes(p.id_producto)
+  );
+
   return (
     <div>
       {/* ENCABEZADO CORPORATIVO */}
@@ -1633,9 +1857,9 @@ export default function CatalogoAdminPage() {
           <span className="erp-badge erp-badge--uva">
             SIGE Candy · Sesión: {usuarioActual.nombre}
           </span>
-          <h1 className="erp-page-title">Gestión de Catálogo, Descuentos y Auditoría</h1>
+          <h1 className="erp-page-title">Gestión de Catálogo, Borradores y Auditoría</h1>
           <p className="erp-page-subtitle">
-            Control de productos activos, carga masiva desde Excel, borradores, aguinaldos, promociones 23:59 hrs y bitácora.
+            Control de productos publicados en Tienda Web, bandeja de preparación de borradores, promociones y bitácora.
           </p>
         </div>
 
@@ -1645,8 +1869,20 @@ export default function CatalogoAdminPage() {
             className={tab === 'productos' ? 'activo' : ''}
             onClick={() => setTab('productos')}
           >
-            <ErpIcon name="tag" size={15} />
-            <span>Activos ({productosActivos.length})</span>
+            <ErpIcon name="store" size={15} />
+            <span>En Tienda Web ({productosPublicados.length})</span>
+          </button>
+
+          <button
+            type="button"
+            className={tab === 'borradores' ? 'activo' : ''}
+            onClick={() => {
+              setTab('borradores');
+              setConfirmandoEliminarBorradores(false);
+            }}
+          >
+            <ErpIcon name="clipboard" size={15} />
+            <span>Borradores ({productosBorradores.length})</span>
           </button>
 
           <button
@@ -1663,7 +1899,7 @@ export default function CatalogoAdminPage() {
             className={tab === 'banners' ? 'activo' : ''}
             onClick={() => setTab('banners')}
           >
-            <ErpIcon name="store" size={15} />
+            <ErpIcon name="tag" size={15} />
             <span>Banners ({banners.length})</span>
           </button>
 
@@ -1680,7 +1916,26 @@ export default function CatalogoAdminPage() {
         </div>
       </div>
 
-      {/* ══════════ PESTAÑA 1: PRODUCTOS ACTIVOS ══════════ */}
+      {/* PANEL COMPARTIDO DE IMPORTACIÓN DESDE EXCEL (disponible en Tienda Web y Borradores) */}
+      {(tab === 'productos' || tab === 'borradores') && (
+        <div className={`erp-collapse ${panelAbierto === 'importar_excel' ? 'abierto' : ''}`}>
+          <div className="erp-collapse__inner">
+            <ErpImportarExcel
+              supabase={supabase}
+              categorias={categorias}
+              productosExistentes={productos}
+              usuarioActual={usuarioActual}
+              onImportSuccess={() => {
+                cargarDatos();
+              }}
+              onNotificar={notificar}
+              onCerrar={() => setPanelAbierto(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ PESTAÑA 1: PRODUCTOS PUBLICADOS EN TIENDA WEB ══════════ */}
       {tab === 'productos' && (
         <>
           <div
@@ -1767,7 +2022,7 @@ export default function CatalogoAdminPage() {
                     <span>Motor de Descuentos Masivos y Vigencia Automática (23:59 hrs)</span>
                   </div>
                   <span className="erp-badge erp-badge--uva">
-                    {productosObjetivo.length} productos seleccionados
+                    {productosObjetivo.length} productos publicados seleccionados
                   </span>
                 </div>
 
@@ -1780,7 +2035,7 @@ export default function CatalogoAdminPage() {
                       options={[
                         { value: 'categoria', label: 'Categoría completa' },
                         { value: 'marca', label: 'Marca comercial' },
-                        { value: 'todos', label: 'Todos los productos activos', badge: productosActivos.length },
+                        { value: 'todos', label: 'Todos los publicados en Tienda Web', badge: productosPublicados.length },
                         { value: 'filtrados', label: 'Productos filtrados actualmente', badge: productosFiltrados.length }
                       ]}
                     />
@@ -1982,13 +2237,13 @@ export default function CatalogoAdminPage() {
                     />
                   </div>
                   <div>
-                    <label className="erp-label">Visibilidad en Tienda Web</label>
+                    <label className="erp-label">Destino al guardar</label>
                     <ErpSelect
                       value={nuevoProd.publicado_web !== false ? 'web' : 'borrador'}
                       onChange={val => setNuevoProd({ ...nuevoProd, publicado_web: val === 'web' })}
                       options={[
-                        { value: 'web', label: 'Publicado en Tienda Web' },
-                        { value: 'borrador', label: 'Borrador (Solo en SIGE Candy)' }
+                        { value: 'borrador', label: 'Guardar en Borradores (Solo SIGE)' },
+                        { value: 'web', label: 'Publicar directo en Tienda Web' }
                       ]}
                     />
                   </div>
@@ -2008,7 +2263,7 @@ export default function CatalogoAdminPage() {
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label className="erp-label">Fotografía del Producto</label>
                     <ErpImageUpload
-                      previewUrl={resolverImagenProducto(nuevoProd.imagen_url)}
+                      previewUrl={nuevoProd.imagen_url ? resolverImagenProducto(nuevoProd.imagen_url) : ''}
                       title="Fotografía para la tienda en línea"
                       subtitle="Arrastra una imagen aquí o haz clic para seleccionarla · PNG sin fondo o WEBP"
                       buttonLabel="Subir fotografía"
@@ -2027,21 +2282,6 @@ export default function CatalogoAdminPage() {
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
-
-          {/* ACORDEÓN 3: IMPORTACIÓN MASIVA DESDE EXCEL */}
-          <div className={`erp-collapse ${panelAbierto === 'importar_excel' ? 'abierto' : ''}`}>
-            <div className="erp-collapse__inner">
-              <ErpImportarExcel
-                supabase={supabase}
-                categorias={categorias}
-                productosExistentes={productos}
-                usuarioActual={usuarioActual}
-                onImportSuccess={cargarDatos}
-                onNotificar={notificar}
-                onCerrar={() => setPanelAbierto(null)}
-              />
             </div>
           </div>
 
@@ -2099,14 +2339,12 @@ export default function CatalogoAdminPage() {
               </div>
 
               <div>
-                <label className="erp-label">Promoción / Estado Web</label>
+                <label className="erp-label">Promoción / Destacado</label>
                 <ErpSelect
                   value={filtroOferta}
                   onChange={setFiltroOferta}
                   options={[
-                    { value: 'todos', label: 'Todos los productos' },
-                    { value: 'solo_erp', label: 'Solo SIGE Candy (Borradores)', badge: totalBorradoresActivos },
-                    { value: 'publicados_web', label: 'Publicados en Tienda Web' },
+                    { value: 'todos', label: 'Todos los publicados' },
                     { value: 'con_descuento', label: 'Con descuento vigente' },
                     { value: 'sin_descuento', label: 'Precio regular (0%)' },
                     { value: 'vencidos', label: 'Ofertas vencidas' },
@@ -2135,30 +2373,25 @@ export default function CatalogoAdminPage() {
               </div>
             </div>
 
-            {(hayFiltrosActivos || totalBorradoresActivos > 0) && (
+            {(hayFiltrosActivos || productosBorradores.length > 0) && (
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--linea)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <span style={{ fontSize: 12.5, color: 'var(--texto-2)' }}>
                   {hayFiltrosActivos ? (
-                    <>Resultados filtrados: <b>{productosFiltrados.length}</b> de <b>{productosActivos.length}</b> productos activos.</>
+                    <>Mostrando <b>{productosFiltrados.length}</b> de <b>{productosPublicados.length}</b> productos publicados.</>
                   ) : (
-                    <>Tienes <b>{totalBorradoresActivos}</b> {totalBorradoresActivos === 1 ? 'producto en borrador' : 'productos en borrador'} (Solo SIGE Candy).</>
+                    <>Tienes <b>{productosBorradores.length}</b> {productosBorradores.length === 1 ? 'producto pendiente' : 'productos pendientes'} en la bandeja de Borradores.</>
                   )}
                 </span>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {borradoresEnFiltro.length > 0 && (
+                  {productosBorradores.length > 0 && (
                     <button
                       type="button"
-                      disabled={publicandoMasivo}
-                      onClick={publicarBorradoresFiltrados}
-                      className="erp-btn erp-btn--primario"
-                      style={{ padding: '5px 11px', fontSize: 11.5, background: '#00A650' }}
+                      onClick={() => setTab('borradores')}
+                      className="erp-btn erp-btn--secundario"
+                      style={{ padding: '5px 11px', fontSize: 11.5 }}
                     >
-                      <ErpIcon name="check" size={13} />
-                      <span>
-                        {publicandoMasivo
-                          ? 'Publicando...'
-                          : `Publicar ${borradoresEnFiltro.length} borradores en web`}
-                      </span>
+                      <ErpIcon name="clipboard" size={13} />
+                      <span>Revisar Borradores ({productosBorradores.length})</span>
                     </button>
                   )}
                   {hayFiltrosActivos && (
@@ -2173,7 +2406,7 @@ export default function CatalogoAdminPage() {
                         style={{ padding: '5px 11px', fontSize: 11.5 }}
                       >
                         <ErpIcon name="tag" size={13} />
-                        <span>Programar descuento a estos {productosFiltrados.length} productos</span>
+                        <span>Programar descuento a estos {productosFiltrados.length}</span>
                       </button>
                       <button
                         type="button"
@@ -2190,14 +2423,14 @@ export default function CatalogoAdminPage() {
             )}
           </div>
 
-          {/* CONTENIDO DE PRODUCTOS ACTIVOS */}
+          {/* CONTENIDO DE PRODUCTOS PUBLICADOS */}
           {cargando ? (
             <div className="erp-card" style={{ textAlign: 'center', padding: 48, color: 'var(--texto-2)' }}>
               Cargando catálogo de productos...
             </div>
           ) : productosFiltrados.length === 0 ? (
             <div className="erp-card" style={{ textAlign: 'center', padding: 48, color: 'var(--tenue)' }}>
-              No se encontraron productos activos con los filtros seleccionados.
+              No se encontraron productos publicados con los filtros seleccionados.
             </div>
           ) : modoVista === 'categorias' ? (
             <div className="erp-cat-workspace erp-anim-3">
@@ -2212,11 +2445,11 @@ export default function CatalogoAdminPage() {
                   className={`erp-cat-dir-btn ${filtroCat === 'todas' ? 'activo' : ''}`}
                 >
                   <span>Todas las categorías</span>
-                  <span className="erp-cat-dir-count">{productosActivos.length}</span>
+                  <span className="erp-cat-dir-count">{productosPublicados.length}</span>
                 </button>
 
                 {categorias.map(c => {
-                  const prodsCat = productosActivos.filter(p => Number(p.id_categoria) === Number(c.id_categoria));
+                  const prodsCat = productosPublicados.filter(p => Number(p.id_categoria) === Number(c.id_categoria));
                   const ofertasCat = prodsCat.filter(p => evaluarVigenciaDescuento(p).activoEnTienda).length;
                   const activa = String(filtroCat) === String(c.id_categoria);
 
@@ -2293,11 +2526,6 @@ export default function CatalogoAdminPage() {
                             <h2>{grupo.nombre_categoria}</h2>
                             <div className="erp-cat-panel__meta">
                               <span><b>{grupo.items.length}</b> productos</span>
-                              {grupo.borradores > 0 && (
-                                <span style={{ color: '#C8320A', fontWeight: 600 }}>
-                                  · {grupo.borradores} solo SIGE
-                                </span>
-                              )}
                               {grupo.conDescuento > 0 && (
                                 <span style={{ color: 'var(--marca)', fontWeight: 600 }}>
                                   · {grupo.conDescuento} con descuento vigente
@@ -2361,7 +2589,15 @@ export default function CatalogoAdminPage() {
                   })
                 )}
 
-                {filtroCat !== 'todas' && renderPaginacion()}
+                {filtroCat !== 'todas' &&
+                  renderPaginacionGenerica(
+                    productosFiltrados.length,
+                    pagSegura,
+                    totalPaginas,
+                    porPagina,
+                    setPaginaActual,
+                    setPorPagina
+                  )}
               </div>
             </div>
           ) : modoVista === 'tarjetas' ? (
@@ -2369,7 +2605,14 @@ export default function CatalogoAdminPage() {
               <div className="erp-catalog-grid">
                 {productosPaginados.map(p => renderTarjetaCuadricula(p))}
               </div>
-              {renderPaginacion()}
+              {renderPaginacionGenerica(
+                productosFiltrados.length,
+                pagSegura,
+                totalPaginas,
+                porPagina,
+                setPaginaActual,
+                setPorPagina
+              )}
             </div>
           ) : (
             <div className="erp-anim-3">
@@ -2382,7 +2625,6 @@ export default function CatalogoAdminPage() {
                       <th>Marca</th>
                       <th>Piezas / Paq.</th>
                       <th>Precio Unitario</th>
-                      <th>Estado Web</th>
                       <th>Disponibilidad</th>
                       <th style={{ textAlign: 'right' }}>Detalle</th>
                     </tr>
@@ -2439,13 +2681,6 @@ export default function CatalogoAdminPage() {
                             )}
                           </td>
                           <td>
-                            {p.publicado_web === false ? (
-                              <span className="erp-badge erp-badge--naranja">Solo SIGE</span>
-                            ) : (
-                              <span className="erp-badge erp-badge--verde">En Tienda Web</span>
-                            )}
-                          </td>
-                          <td>
                             <span style={{ fontSize: 12, fontWeight: 600, color: agotado ? '#C8320A' : '#007A3B' }}>
                               {agotado ? 'Agotado (0)' : `${p.stock_web} disp.`}
                             </span>
@@ -2470,13 +2705,574 @@ export default function CatalogoAdminPage() {
                   </tbody>
                 </table>
               </div>
-              {renderPaginacion()}
+              {renderPaginacionGenerica(
+                productosFiltrados.length,
+                pagSegura,
+                totalPaginas,
+                porPagina,
+                setPaginaActual,
+                setPorPagina
+              )}
             </div>
           )}
         </>
       )}
 
-      {/* ══════════ PESTAÑA 2: PRODUCTOS DADOS DE BAJA ══════════ */}
+      {/* ══════════ PESTAÑA 2: BORRADORES (MESA DE PREPARACIÓN PRE-WEB) ══════════ */}
+      {tab === 'borradores' && (
+        <div className="erp-anim-2">
+          {/* Tarjetas resumen clicables como filtros de control de calidad */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))', gap: 12, marginBottom: 16 }}>
+            <button
+              type="button"
+              onClick={() => setFiltroCalidadBorradores('todos')}
+              className="erp-card"
+              style={{
+                margin: 0,
+                padding: '14px 16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                border: filtroCalidadBorradores === 'todos' ? '1.5px solid var(--uva)' : '1px solid var(--linea)',
+                background: filtroCalidadBorradores === 'todos' ? '#F8F4FC' : '#fff'
+              }}
+            >
+              <small style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--uva)' }}>TOTAL BORRADORES</small>
+              <b style={{ fontSize: 24, color: 'var(--texto)' }}>{productosBorradores.length}</b>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--texto-2)', marginTop: 2 }}>Ocultos en tienda web</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFiltroCalidadBorradores(filtroCalidadBorradores === 'listos' ? 'todos' : 'listos')}
+              className="erp-card"
+              style={{
+                margin: 0,
+                padding: '14px 16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                border: filtroCalidadBorradores === 'listos' ? '1.5px solid #00A650' : '1px solid var(--linea)',
+                background: filtroCalidadBorradores === 'listos' ? '#EEFBF4' : '#fff'
+              }}
+            >
+              <small style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#007A3B' }}>LISTOS PARA PUBLICAR</small>
+              <b style={{ fontSize: 24, color: '#007A3B' }}>{resumenBorradores.listos}</b>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--texto-2)', marginTop: 2 }}>Con foto y stock PEPS &gt; 0</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFiltroCalidadBorradores(filtroCalidadBorradores === 'sin_foto' ? 'todos' : 'sin_foto')}
+              className="erp-card"
+              style={{
+                margin: 0,
+                padding: '14px 16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                border: filtroCalidadBorradores === 'sin_foto' ? '1.5px solid #D97706' : '1px solid var(--linea)',
+                background: filtroCalidadBorradores === 'sin_foto' ? '#FFFBEB' : '#fff'
+              }}
+            >
+              <small style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#B45309' }}>SIN FOTOGRAFÍA</small>
+              <b style={{ fontSize: 24, color: '#B45309' }}>{resumenBorradores.sinFoto}</b>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--texto-2)', marginTop: 2 }}>Arrastra la foto en su tarjeta</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFiltroCalidadBorradores(filtroCalidadBorradores === 'sin_stock' ? 'todos' : 'sin_stock')}
+              className="erp-card"
+              style={{
+                margin: 0,
+                padding: '14px 16px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                border: filtroCalidadBorradores === 'sin_stock' ? '1.5px solid #C8320A' : '1px solid var(--linea)',
+                background: filtroCalidadBorradores === 'sin_stock' ? '#FFF5F3' : '#fff'
+              }}
+            >
+              <small style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#C8320A' }}>SIN STOCK PEPS (0)</small>
+              <b style={{ fontSize: 24, color: '#C8320A' }}>{resumenBorradores.sinStock}</b>
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--texto-2)', marginTop: 2 }}>Pendientes de lote en Almacén</span>
+            </button>
+          </div>
+
+          {/* Barra de herramientas y filtros de Borradores */}
+          <div className="erp-card" style={{ padding: '16px 20px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flex: 1, minWidth: 280, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 210, maxWidth: 320 }}>
+                  <label className="erp-label">Buscar en borradores</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      className="erp-input"
+                      style={{ paddingLeft: 34 }}
+                      placeholder="Código, nombre o marca..."
+                      value={busquedaBorradores}
+                      onChange={e => setBusquedaBorradores(e.target.value)}
+                    />
+                    <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--tenue)' }}>
+                      <ErpIcon name="search" size={15} />
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ width: 220 }}>
+                  <label className="erp-label">Categoría</label>
+                  <ErpSelect
+                    value={filtroCatBorradores}
+                    onChange={setFiltroCatBorradores}
+                    searchPlaceholder="Buscar categoría..."
+                    options={opcionesCatBorradores}
+                  />
+                </div>
+
+                <div style={{ width: 230 }}>
+                  <label className="erp-label">Estado de preparación</label>
+                  <ErpSelect
+                    value={filtroCalidadBorradores}
+                    onChange={setFiltroCalidadBorradores}
+                    options={[
+                      { value: 'todos', label: 'Todos los borradores', badge: productosBorradores.length },
+                      { value: 'listos', label: 'Listos (Con foto y stock > 0)', badge: resumenBorradores.listos },
+                      { value: 'con_foto', label: 'Con fotografía cargada', badge: resumenBorradores.conFoto },
+                      { value: 'sin_foto', label: 'Sin fotografía', badge: resumenBorradores.sinFoto },
+                      { value: 'sin_stock', label: 'Sin stock PEPS (= 0)', badge: resumenBorradores.sinStock }
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPanelAbierto(panelAbierto === 'importar_excel' ? null : 'importar_excel')}
+                className={`erp-btn ${panelAbierto === 'importar_excel' ? 'erp-btn--uva' : 'erp-btn--secundario'}`}
+              >
+                <ErpIcon name="clipboard" size={15} />
+                <span>{panelAbierto === 'importar_excel' ? 'Cerrar Importador' : 'Importar más desde Excel'}</span>
+              </button>
+            </div>
+
+            {/* Accesos rápidos de selección múltiple */}
+            {borradoresFiltrados.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--linea)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--texto-2)' }}>Selección rápida:</span>
+                  <button
+                    type="button"
+                    onClick={() => seleccionarGrupoBorradores('todos_filtrados')}
+                    className="erp-btn erp-btn--secundario"
+                    style={{ padding: '5px 10px', fontSize: 11.5 }}
+                  >
+                    Todos ({borradoresFiltrados.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => seleccionarGrupoBorradores('con_foto')}
+                    className="erp-btn erp-btn--secundario"
+                    style={{ padding: '5px 10px', fontSize: 11.5 }}
+                  >
+                    Solo con foto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => seleccionarGrupoBorradores('listos')}
+                    className="erp-btn erp-btn--secundario"
+                    style={{ padding: '5px 10px', fontSize: 11.5 }}
+                  >
+                    Solo listos (Foto + Stock)
+                  </button>
+                  {seleccionBorradores.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => seleccionarGrupoBorradores('ninguno')}
+                      className="link"
+                      style={{ fontSize: 12 }}
+                    >
+                      Quitar selección ({seleccionBorradores.length})
+                    </button>
+                  )}
+                </div>
+
+                <span style={{ fontSize: 12, color: 'var(--texto-2)' }}>
+                  Tip: arrastra una imagen directo sobre la foto de cualquier borrador para guardarla al instante.
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Barra contextual de acciones en lote cuando hay borradores seleccionados */}
+          {seleccionBorradores.length > 0 && (
+            <div
+              className="erp-card erp-anim-1"
+              style={{
+                padding: '12px 18px',
+                marginBottom: 16,
+                border: '1.5px solid var(--uva)',
+                background: '#FBF8FE',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 12
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="erp-badge erp-badge--uva" style={{ fontSize: 12 }}>
+                  {seleccionBorradores.length} seleccionado(s)
+                </span>
+                <span style={{ fontSize: 12.5, color: 'var(--texto-2)' }}>
+                  {borradoresSeleccionadosObjs.filter(p => !tieneFotoReal(p)).length > 0
+                    ? `Aviso: ${borradoresSeleccionadosObjs.filter(p => !tieneFotoReal(p)).length} aún no tienen fotografía.`
+                    : 'Todos los seleccionados tienen fotografía lista.'}
+                </span>
+              </div>
+
+              {!confirmandoEliminarBorradores ? (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    disabled={publicandoMasivo || eliminandoBorradores}
+                    onClick={() => setConfirmandoEliminarBorradores(true)}
+                    className="erp-btn erp-btn--secundario"
+                    style={{ color: '#C8320A', borderColor: '#F7C5B8', padding: '7px 13px', fontSize: 12 }}
+                  >
+                    <ErpIcon name="trash" size={14} />
+                    <span>Eliminar borradores</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={publicandoMasivo || eliminandoBorradores}
+                    onClick={() => publicarBorradores(borradoresSeleccionadosObjs)}
+                    className="erp-btn erp-btn--primario"
+                    style={{ background: '#00A650', padding: '7px 16px', fontSize: 12.5 }}
+                  >
+                    <ErpIcon name="check" size={14} />
+                    <span>
+                      {publicandoMasivo
+                        ? 'Publicando...'
+                        : `Publicar ${seleccionBorradores.length} en Tienda Web`}
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#C8320A' }}>
+                    ¿Eliminar {seleccionBorradores.length} borrador(es) de forma permanente?
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoEliminarBorradores(false)}
+                    className="erp-btn erp-btn--secundario"
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={eliminandoBorradores}
+                    onClick={eliminarBorradoresSeleccionados}
+                    className="erp-btn"
+                    style={{ background: '#C8320A', color: '#fff', padding: '6px 14px', fontSize: 12 }}
+                  >
+                    {eliminandoBorradores ? 'Eliminando...' : 'Sí, eliminar'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lista de Borradores */}
+          {cargando ? (
+            <div className="erp-card" style={{ textAlign: 'center', padding: 48, color: 'var(--texto-2)' }}>
+              Cargando bandeja de borradores...
+            </div>
+          ) : productosBorradores.length === 0 ? (
+            <div className="erp-card" style={{ textAlign: 'center', padding: 48 }}>
+              <b style={{ display: 'block', fontSize: 16, color: 'var(--texto)', marginBottom: 6 }}>
+                Tu bandeja de borradores está al día
+              </b>
+              <p style={{ fontSize: 13, color: 'var(--texto-2)', marginBottom: 16 }}>
+                Todos tus productos activos están publicados en la Tienda Web. Cuando importes un Excel o registres un borrador, aparecerá aquí para que lo revises y le subas foto.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPanelAbierto('importar_excel')}
+                className="erp-btn erp-btn--primario"
+              >
+                <ErpIcon name="clipboard" size={15} />
+                <span>Importar productos desde Excel</span>
+              </button>
+            </div>
+          ) : borradoresFiltrados.length === 0 ? (
+            <div className="erp-card" style={{ textAlign: 'center', padding: 44, color: 'var(--tenue)' }}>
+              No hay borradores que coincidan con este filtro.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: 14 }}>
+                {borradoresPaginados.map(p => {
+                  const fotoOk = tieneFotoReal(p);
+                  const stockNum = Number(p.stock_web || 0);
+                  const stockOk = stockNum > 0;
+                  const piezasNum = Number(p.piezas_por_paquete || 0);
+                  const listo = fotoOk && stockOk;
+                  const seleccionado = seleccionBorradores.includes(p.id_producto);
+                  const subiendoEste = subiendoFotoId === p.id_producto;
+                  const dragSobreEste = dragOverBorradorId === p.id_producto;
+                  const marcaTxt = normalizarMarca(p.marca);
+                  const precioBase = Number(p.precio_unitario || 0);
+                  const mayoreo = (precioBase * 0.95).toFixed(2);
+
+                  return (
+                    <article
+                      key={p.id_producto}
+                      className="erp-card"
+                      style={{
+                        margin: 0,
+                        padding: 16,
+                        border: seleccionado
+                          ? '1.5px solid var(--uva)'
+                          : listo
+                          ? '1px solid #B7E4C7'
+                          : '1px solid var(--linea)',
+                        background: seleccionado ? '#FBF8FE' : '#fff',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                        transition: 'border-color 0.15s, background 0.15s'
+                      }}
+                    >
+                      {/* Cabecera de tarjeta: checkbox + código + estado general */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', minWidth: 0 }}>
+                          <input
+                            type="checkbox"
+                            checked={seleccionado}
+                            onChange={() => toggleSeleccionBorrador(p.id_producto)}
+                            style={{ width: 16, height: 16, accentColor: 'var(--uva)', cursor: 'pointer' }}
+                          />
+                          <span style={{ fontFamily: 'monospace', fontSize: 11.5, fontWeight: 700, color: 'var(--tenue)' }}>
+                            {p.codigo_barras}
+                          </span>
+                        </label>
+
+                        <span className={`erp-badge ${listo ? 'erp-badge--verde' : 'erp-badge--amarillo'}`}>
+                          <span className="erp-badge__dot" />
+                          {listo ? 'Listo para publicar' : 'En preparación'}
+                        </span>
+                      </div>
+
+                      {/* Cuerpo: Zona de foto rápida (clic o drag & drop) + datos del producto */}
+                      <div style={{ display: 'flex', gap: 13, alignItems: 'stretch' }}>
+                        <label
+                          onDragOver={e => {
+                            e.preventDefault();
+                            setDragOverBorradorId(p.id_producto);
+                          }}
+                          onDragLeave={() => setDragOverBorradorId(null)}
+                          onDrop={e => {
+                            e.preventDefault();
+                            setDragOverBorradorId(null);
+                            const f = e.dataTransfer?.files?.[0];
+                            if (f && f.type.startsWith('image/')) subirFotoRapidaBorrador(f, p);
+                          }}
+                          title="Haz clic o arrastra una fotografía aquí"
+                          style={{
+                            width: 92,
+                            minHeight: 92,
+                            borderRadius: 10,
+                            border: dragSobreEste
+                              ? '2px dashed var(--marca)'
+                              : fotoOk
+                              ? '1px solid var(--linea)'
+                              : '1.5px dashed #D97706',
+                            background: dragSobreEste ? '#FFF4FA' : fotoOk ? '#F9F8FB' : '#FFFBEB',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 6,
+                            cursor: 'pointer',
+                            position: 'relative',
+                            flexShrink: 0,
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <input
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) subirFotoRapidaBorrador(f, p);
+                              e.target.value = '';
+                            }}
+                          />
+
+                          {subiendoEste ? (
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--uva)', textAlign: 'center' }}>
+                              Subiendo...
+                            </span>
+                          ) : fotoOk ? (
+                            <>
+                              <img
+                                src={resolverImagenProducto(p.imagen_url)}
+                                alt={p.nombre_dulce}
+                                style={{ width: '100%', height: 68, objectFit: 'contain' }}
+                                onError={e => { e.currentTarget.src = '/img/ICONO.png'; }}
+                              />
+                              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--uva)', marginTop: 2 }}>
+                                Cambiar foto
+                              </span>
+                            </>
+                          ) : (
+                            <div style={{ textAlign: 'center', color: '#B45309' }}>
+                              <ErpIcon name="plus" size={18} />
+                              <span style={{ display: 'block', fontSize: 10.5, fontWeight: 700, marginTop: 3, lineHeight: 1.2 }}>
+                                Subir foto
+                              </span>
+                            </div>
+                          )}
+                        </label>
+
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 4 }}>
+                              <span className="erp-badge erp-badge--uva" style={{ fontSize: 10, padding: '1px 7px' }}>
+                                {p.tbl_categorias?.nombre_categoria || 'General'}
+                              </span>
+                              {marcaTxt !== SIN_MARCA && (
+                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--texto-2)' }}>
+                                  {marcaTxt}
+                                </span>
+                              )}
+                            </div>
+
+                            <h3
+                              style={{
+                                fontSize: 14.5,
+                                fontWeight: 700,
+                                color: 'var(--texto)',
+                                margin: '0 0 2px',
+                                lineHeight: 1.25
+                              }}
+                            >
+                              {p.nombre_dulce}
+                            </h3>
+
+                            <p style={{ fontSize: 12, color: 'var(--texto-2)', margin: 0 }}>
+                              {p.presentacion || 'Pieza'} · {p.es_transaccional ? 'Checkout Web' : 'Cotización WA'}
+                            </p>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 6 }}>
+                            <b style={{ fontSize: 16, color: 'var(--texto)' }}>${precioBase.toFixed(2)}</b>
+                            <small style={{ fontSize: 11.5, color: '#007A3B', fontWeight: 600 }}>
+                              5+: ${mayoreo}
+                            </small>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Semáforo de preparación */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: fotoOk ? '#E8F7EF' : '#FEF3C7',
+                            color: fotoOk ? '#007A3B' : '#B45309'
+                          }}
+                        >
+                          {fotoOk ? '✓ Foto lista' : '• Falta foto'}
+                        </span>
+
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: stockOk ? '#E8F7EF' : '#FDECE8',
+                            color: stockOk ? '#007A3B' : '#C8320A'
+                          }}
+                        >
+                          {stockOk ? `✓ Stock: ${stockNum}` : '• Stock PEPS: 0'}
+                        </span>
+
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            background: '#F4F1F8',
+                            color: piezasNum > 0 ? 'var(--uva)' : 'var(--tenue)'
+                          }}
+                        >
+                          {piezasNum > 0 ? `${piezasNum} pzas/paq` : '0 pzas (no aguinaldo)'}
+                        </span>
+                      </div>
+
+                      {/* Acciones directas de la tarjeta */}
+                      <div style={{ display: 'flex', gap: 8, paddingTop: 10, borderTop: '1px solid var(--linea)' }}>
+                        <button
+                          type="button"
+                          onClick={() => setProdPreviewWeb(p)}
+                          className="erp-btn erp-btn--secundario"
+                          style={{ padding: '6px 10px', fontSize: 12 }}
+                          title="Ver cómo aparecerá en la tienda web"
+                        >
+                          <ErpIcon name="eye" size={14} />
+                          <span>Vista web</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => abrirInspectorProducto(p)}
+                          className="erp-btn erp-btn--secundario"
+                          style={{ padding: '6px 10px', fontSize: 12 }}
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={publicandoMasivo}
+                          onClick={() => publicarBorradores([p])}
+                          className="erp-btn erp-btn--primario"
+                          style={{
+                            flex: 1,
+                            padding: '6px 12px',
+                            fontSize: 12,
+                            background: listo ? '#00A650' : 'var(--marca)'
+                          }}
+                        >
+                          <ErpIcon name="check" size={14} />
+                          <span>Publicar</span>
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {renderPaginacionGenerica(
+                borradoresFiltrados.length,
+                pagBorrSegura,
+                totalPagBorradores,
+                porPaginaBorradores,
+                setPaginaBorradores,
+                setPorPaginaBorradores
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ PESTAÑA 3: PRODUCTOS DADOS DE BAJA ══════════ */}
       {tab === 'bajas' && (
         <div className="erp-anim-2">
           <div className="erp-card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -2586,7 +3382,7 @@ export default function CatalogoAdminPage() {
         </div>
       )}
 
-      {/* ══════════ PESTAÑA 3: BANNERS ══════════ */}
+      {/* ══════════ PESTAÑA 4: BANNERS ══════════ */}
       {tab === 'banners' && (
         <div className="erp-anim-2">
           <div id="simulador-banner-vivo" className="erp-card" style={{ padding: 20, marginBottom: 18, scrollMarginTop: 90 }}>
@@ -2626,7 +3422,6 @@ export default function CatalogoAdminPage() {
             </div>
           </div>
 
-          {/* ACORDEÓN PARA CREAR NUEVO BANNER */}
           <div className={`erp-collapse ${mostrarFormBanner ? 'abierto' : ''}`}>
             <div className="erp-collapse__inner">
               <form
@@ -2731,7 +3526,6 @@ export default function CatalogoAdminPage() {
             </div>
           </div>
 
-          {/* LISTA DE BANNERS */}
           <div style={{ display: 'grid', gap: 14 }}>
             {banners.map((b, idx) => {
               const { tag: tagActual, desc: descActual, destino: destinoActual } = descomponerLeyendaBanner(
@@ -3020,7 +3814,7 @@ export default function CatalogoAdminPage() {
         </div>
       )}
 
-      {/* ══════════ PESTAÑA 4: BITÁCORA DE AUDITORÍA ══════════ */}
+      {/* ══════════ PESTAÑA 5: BITÁCORA DE AUDITORÍA ══════════ */}
       {tab === 'auditoria' && usuarioActual.rol === 'admin' && (
         <div className="erp-anim-2">
           <div className="erp-card" style={{ padding: '16px 20px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
@@ -3048,6 +3842,7 @@ export default function CatalogoAdminPage() {
                     { value: 'DESCUENTO_MASIVO', label: 'Descuentos Masivos' },
                     { value: 'IMPORTACION_EXCEL', label: 'Importaciones Excel' },
                     { value: 'VISIBILIDAD_WEB', label: 'Visibilidad Web' },
+                    { value: 'ELIMINACION_BORRADOR', label: 'Borradores Eliminados' },
                     { value: 'ALTA_PRODUCTO', label: 'Altas de Producto' },
                     { value: 'BAJA_LOGICA', label: 'Bajas de Catálogo' },
                     { value: 'REACTIVACION', label: 'Republicaciones' },
@@ -3160,6 +3955,164 @@ export default function CatalogoAdminPage() {
         </div>
       )}
 
+      {/* ══════════ MODAL: VISTA PREVIA DE TARJETA EN TIENDA WEB ══════════ */}
+      {prodPreviewWeb && (() => {
+        const p = prodPreviewWeb;
+        const vig = evaluarVigenciaDescuento(p);
+        const precioBase = Number(p.precio_unitario || 0);
+        const precioFinal = vig.activoEnTienda
+          ? Number((precioBase * (1 - vig.pctEfectivo / 100)).toFixed(2))
+          : precioBase;
+        const precioMayoreo = (precioFinal * 0.95).toFixed(2);
+        const fotoOk = tieneFotoReal(p);
+        const agotado = Number(p.stock_web || 0) <= 0;
+        const marcaTxt = normalizarMarca(p.marca);
+
+        return (
+          <div
+            className="erp-drawer-backdrop"
+            style={{ justifyContent: 'center', alignItems: 'center', padding: 20 }}
+            onClick={() => setProdPreviewWeb(null)}
+          >
+            <div
+              className="erp-card erp-anim-1"
+              onClick={e => e.stopPropagation()}
+              style={{
+                margin: 0,
+                width: '100%',
+                maxWidth: 420,
+                padding: 20,
+                background: '#fff',
+                borderRadius: 16
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div>
+                  <span className="erp-badge erp-badge--uva">Simulación en Tienda Web</span>
+                  <h3 style={{ fontSize: 15, fontWeight: 800, margin: '4px 0 0' }}>Así lo verá el cliente</h3>
+                </div>
+                <button type="button" onClick={() => setProdPreviewWeb(null)} className="cerrar">✕</button>
+              </div>
+
+              {/* Tarjeta simulada estilo TiendaCandy */}
+              <div
+                style={{
+                  border: '1px solid #ECE6F2',
+                  borderRadius: 16,
+                  overflow: 'hidden',
+                  background: '#fff',
+                  boxShadow: '0 8px 24px rgba(60, 16, 83, 0.08)',
+                  position: 'relative',
+                  marginBottom: 14
+                }}
+              >
+                {agotado ? (
+                  <span style={{ position: 'absolute', top: 10, left: 10, background: '#5F5C68', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 99 }}>
+                    Agotado
+                  </span>
+                ) : vig.activoEnTienda ? (
+                  <span style={{ position: 'absolute', top: 10, left: 10, background: '#EC008C', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 99 }}>
+                    {vig.pctEfectivo}% OFF
+                  </span>
+                ) : p.etiqueta_web === 'nuevo' ? (
+                  <span style={{ position: 'absolute', top: 10, left: 10, background: '#3C1053', color: '#FEDD00', fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 99 }}>
+                    Nuevo
+                  </span>
+                ) : null}
+
+                <div style={{ height: 190, background: '#FAF7FC', display: 'grid', placeItems: 'center', padding: 16 }}>
+                  <img
+                    src={resolverImagenProducto(p.imagen_url)}
+                    alt={p.nombre_dulce}
+                    style={{ maxHeight: 156, maxWidth: '100%', objectFit: 'contain' }}
+                    onError={e => { e.currentTarget.src = '/img/ICONO.png'; }}
+                  />
+                </div>
+
+                <div style={{ padding: 16 }}>
+                  <p style={{ fontSize: 11.5, color: '#6E6678', margin: '0 0 4px', fontWeight: 600 }}>
+                    {p.tbl_categorias?.nombre_categoria || 'Catálogo'}
+                    {marcaTxt !== SIN_MARCA ? ` · ${marcaTxt}` : ''}
+                  </p>
+                  <h4 style={{ fontSize: 16, fontWeight: 800, color: '#22182C', margin: '0 0 8px', lineHeight: 1.25 }}>
+                    {p.nombre_dulce}
+                  </h4>
+
+                  {vig.activoEnTienda && (
+                    <span style={{ display: 'block', fontSize: 12, color: '#8F8899', textDecoration: 'line-through' }}>
+                      ${precioBase.toFixed(2)}
+                    </span>
+                  )}
+
+                  <p style={{ fontSize: 21, fontWeight: 900, color: '#22182C', margin: '0 0 4px' }}>
+                    ${precioFinal.toFixed(2)}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#6E6678', margin: '0 0 4px' }}>
+                    {p.presentacion || 'Pieza'}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#007A3B', fontWeight: 700, margin: '0 0 12px' }}>
+                    Llevando 5+: ${precioMayoreo} c/u
+                  </p>
+
+                  {p.descripcion && (
+                    <p style={{ fontSize: 12, color: '#5A5363', margin: '0 0 12px', lineHeight: 1.4 }}>
+                      {p.descripcion}
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      textAlign: 'center',
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      fontWeight: 800,
+                      fontSize: 13,
+                      background: agotado ? '#ECE9F1' : p.es_transaccional ? '#FCE7F3' : '#E7F8EE',
+                      color: agotado ? '#756F7D' : p.es_transaccional ? '#C6007E' : '#007A3B'
+                    }}
+                  >
+                    {agotado ? 'Agotado' : p.es_transaccional ? 'Agregar' : 'Cotizar por WhatsApp'}
+                  </div>
+                </div>
+              </div>
+
+              {(!fotoOk || agotado) && (
+                <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '9px 12px', fontSize: 12, color: '#92400E', marginBottom: 14 }}>
+                  <b>Antes de publicar:</b>{' '}
+                  {!fotoOk && 'falta subir fotografía real'}
+                  {!fotoOk && agotado && ' y '}
+                  {agotado && 'tiene stock en 0 (saldrá como Agotado hasta registrar su lote en Almacén)'}.
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const copia = p;
+                    setProdPreviewWeb(null);
+                    abrirInspectorProducto(copia);
+                  }}
+                  className="erp-btn erp-btn--secundario"
+                >
+                  Editar datos
+                </button>
+                <button
+                  type="button"
+                  disabled={publicandoMasivo}
+                  onClick={() => publicarBorradores([p])}
+                  className="erp-btn erp-btn--primario"
+                  style={{ background: '#00A650' }}
+                >
+                  <ErpIcon name="check" size={14} />
+                  <span>{publicandoMasivo ? 'Publicando...' : 'Publicar en Tienda Web'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ══════════ PANEL INSPECTOR LATERAL DE PRODUCTO ══════════ */}
       {prodSeleccionado && (
         <div
@@ -3175,7 +4128,7 @@ export default function CatalogoAdminPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="erp-badge erp-badge--uva">Detalle del Producto</span>
                   {prodSeleccionado.publicado_web === false && prodSeleccionado.activo !== false && (
-                    <span className="erp-badge erp-badge--naranja">Solo SIGE Candy</span>
+                    <span className="erp-badge erp-badge--amarillo">Borrador (Solo SIGE)</span>
                   )}
                   {prodSeleccionado.activo === false && (
                     <span className="erp-badge erp-badge--naranja">Dado de Baja</span>
@@ -3221,7 +4174,7 @@ export default function CatalogoAdminPage() {
               )}
 
               <ErpImageUpload
-                previewUrl={resolverImagenProducto(prodSeleccionado.imagen_url)}
+                previewUrl={tieneFotoReal(prodSeleccionado) ? resolverImagenProducto(prodSeleccionado.imagen_url) : ''}
                 title="Fotografía en Tienda Web"
                 subtitle="Arrastra una nueva foto aquí o haz clic · PNG sin fondo o WEBP"
                 buttonLabel="Reemplazar foto"
@@ -3435,7 +4388,7 @@ export default function CatalogoAdminPage() {
                   onChange={val => setProdSeleccionado({ ...prodSeleccionado, publicado_web: val === 'web' })}
                   options={[
                     { value: 'web', label: 'Publicado — Visible para clientes en la tienda' },
-                    { value: 'borrador', label: 'Borrador — Solo visible en SIGE Candy (oculto en web)' }
+                    { value: 'borrador', label: 'Borrador — Mover a bandeja de Borradores (oculto en web)' }
                   ]}
                 />
               </div>

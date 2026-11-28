@@ -2,15 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import {
+  registrarMetricaWeb,
+  registrarVisitaUnica,
+  registrarVistaProductoUnica
+} from '@/lib/ecommerce/metricasWeb';
 
 export default function TiendaCandy() {
-  const iniciado = useRef(false);
   const sincronizarRef = useRef(null);
 
   useEffect(() => {
-    if (iniciado.current) return;
-    iniciado.current = true;
-
+    const ac = new AbortController();
+    const { signal } = ac;
     const supabase = createClient();
 
     const CONFIG = {
@@ -22,12 +25,12 @@ export default function TiendaCandy() {
     };
 
     const CATEGORIAS = [
-      { id:'gomitas',    nombre:'Gomitas',    img:'img/Gomita.png',            color:'#EC008C' },
-      { id:'chocolates', nombre:'Chocolates', img:'img/Chocolate.png',         color:'#8B5E3C' },
-      { id:'caramelos',  nombre:'Caramelos',  img:'img/Caramelo.png',          color:'#F7941D' },
-      { id:'paletas',    nombre:'Paletas',    img:'img/Paleta.png',            color:'#0085CA' },
-      { id:'enchilados', nombre:'Enchilados', img:'img/Caramelo_enchilado.png',color:'#E63329' },
-      { id:'fiesta',     nombre:'Fiesta',     img:'img/Fiesta.png',            color:'#00A650' }
+      { id:'gomitas',    nombre:'Gomitas',    img:'/img/Gomita.png',            color:'#EC008C' },
+      { id:'chocolates', nombre:'Chocolates', img:'/img/Chocolate.png',         color:'#8B5E3C' },
+      { id:'caramelos',  nombre:'Caramelos',  img:'/img/Caramelo.png',          color:'#F7941D' },
+      { id:'paletas',    nombre:'Paletas',    img:'/img/Paleta.png',            color:'#0085CA' },
+      { id:'enchilados', nombre:'Enchilados', img:'/img/Caramelo_enchilado.png',color:'#E63329' },
+      { id:'fiesta',     nombre:'Fiesta',     img:'/img/Fiesta.png',            color:'#00A650' }
     ];
     const colorCat = id => (CATEGORIAS.find(c=>c.id===id)||{}).color || 'var(--marca)';
 
@@ -136,11 +139,19 @@ export default function TiendaCandy() {
     const escapar = t => String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
     const waLink  = m => `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(m)}`;
     const nombreCat = id => (CATEGORIAS.find(c=>c.id===id)||{}).nombre || id;
-    const imgDe = p => p.img || (CATEGORIAS.find(c=>c.id===p.cat)||{}).img || 'img/ICONO.png';
+    const imgDe = p => {
+      const raw = p.img || (CATEGORIAS.find(c=>c.id===p.cat)||{}).img || '/img/ICONO.png';
+      if (raw.startsWith('http') || raw.startsWith('data:') || raw.startsWith('blob:') || raw.startsWith('/')) return raw;
+      return `/${raw}`;
+    };
     const pctOff = p => p.descuentoPct || (p.antes ? Math.round((1 - p.precio/p.antes) * 100) : 0);
     const quieto = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const leerJSON = (k, d) => { try{ return JSON.parse(localStorage.getItem(k)) ?? d; }catch(_){ return d; } };
     const guardarJSON = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(_){} };
+
+    let pendienteIrAPago = false;
+    let busquedaTimer = null;
+    let ultimaBusquedaSinResultado = '';
 
     function avisar(msg, ico='🍬'){
       const cont = $('#avisos');
@@ -195,14 +206,14 @@ export default function TiendaCandy() {
       const botonAccion = agotado
         ? `<button class="btn btn--fantasma btn--bloque btn--sm" disabled>Agotado</button>`
         : soloCotizar
-        ? `<a class="btn btn--wa btn--bloque btn--sm" href="${waLink(`¡Hola! Quiero cotizar por mayoreo: ${p.nombre}`)}" target="_blank" rel="noopener">Cotizar por WhatsApp</a>`
+        ? `<a class="btn btn--wa btn--bloque btn--sm" data-wa-cotizar="${p.id}" href="${waLink(`¡Hola! Quiero cotizar por mayoreo: ${p.nombre}`)}" target="_blank" rel="noopener">Cotizar por WhatsApp</a>`
         : `<button class="btn btn--secundario btn--bloque btn--sm" data-add="${p.id}">Agregar</button>`;
 
       return `
       <article class="prod" style="--c:${colorCat(p.cat)}">
         ${sello}
         <button class="prod__foto" data-ficha="${p.id}" aria-label="Ver ${escapar(p.nombre)}">
-          <img src="${escapar(imgDe(p))}" alt="${escapar(p.nombre)}" loading="lazy" width="180" height="180" onerror="this.src='img/ICONO.png'">
+          <img src="${escapar(imgDe(p))}" alt="${escapar(p.nombre)}" loading="lazy" width="180" height="180" onerror="this.src='/img/ICONO.png'">
         </button>
         <div class="prod__cuerpo">
           <p class="prod__cat">${nombreCat(p.cat)}${p.marca ? ` · ${escapar(p.marca)}` : ''}</p>
@@ -293,15 +304,15 @@ export default function TiendaCandy() {
       if (c){ filtro.cat = c.dataset.fcat; filtro.pagina=1; pintarCatalogo(); cerrarFiltros(); return; }
       const r = e.target.closest('[data-frango]');
       if (r){ filtro.rango = filtro.rango===r.dataset.frango ? null : r.dataset.frango; filtro.pagina=1; pintarCatalogo(); }
-    });
+    }, { signal });
 
-    $('#f-oferta').addEventListener('change', e=>{ filtro.oferta=e.target.checked; filtro.pagina=1; pintarCatalogo(); });
-    $('#f-nuevo').addEventListener('change',  e=>{ filtro.nuevo =e.target.checked; filtro.pagina=1; pintarCatalogo(); });
+    $('#f-oferta').addEventListener('change', e=>{ filtro.oferta=e.target.checked; filtro.pagina=1; pintarCatalogo(); }, { signal });
+    $('#f-nuevo').addEventListener('change',  e=>{ filtro.nuevo =e.target.checked; filtro.pagina=1; pintarCatalogo(); }, { signal });
     $('#f-limpiar').addEventListener('click', ()=>{
       Object.assign(filtro,{cat:'todos',texto:'',rango:null,oferta:false,nuevo:false,pagina:1});
       $('#q').value=''; pintarCatalogo(); cerrarFiltros();
-    });
-    $('#orden').addEventListener('change', e=>{ filtro.orden=e.target.value; filtro.pagina=1; pintarCatalogo(); });
+    }, { signal });
+    $('#orden').addEventListener('change', e=>{ filtro.orden=e.target.value; filtro.pagina=1; pintarCatalogo(); }, { signal });
     $('#chips-activos').addEventListener('click', e=>{
       const b = e.target.closest('[data-quitar]');
       if (!b) return;
@@ -311,15 +322,15 @@ export default function TiendaCandy() {
       else if (k==='rango') filtro.rango=null;
       else filtro[k]=false;
       filtro.pagina=1; pintarCatalogo();
-    });
+    }, { signal });
     $('#paginas').addEventListener('click', e=>{
       const b = e.target.closest('[data-pag]');
       if (!b || b.disabled) return;
       filtro.pagina = +b.dataset.pag;
       pintarCatalogo(); irArriba();
-    });
-    $('#abrir-filtros').addEventListener('click', abrirFiltros);
-    $('#filtros-cerrar').addEventListener('click', ()=>{ cerrarFiltros(); $('#velo').hidden=true; });
+    }, { signal });
+    $('#abrir-filtros').addEventListener('click', abrirFiltros, { signal });
+    $('#filtros-cerrar').addEventListener('click', ()=>{ cerrarFiltros(); $('#velo').hidden=true; }, { signal });
 
     /* ─────────── FICHA DE PRODUCTO ─────────── */
     let cantidadFicha = 1;
@@ -333,10 +344,20 @@ export default function TiendaCandy() {
         ? p.desc
         : `${p.nombre} en presentación ${p.unidad}. Disponible para compra en línea y recolección en sucursal.`;
 
+      registrarVistaProductoUnica(supabase, {
+        id_producto: p.id_db || null,
+        codigo_barras: String(p.id),
+        nombre_producto: p.nombre,
+        categoria: nombreCat(p.cat),
+        valor_texto: agotado ? 'agotado' : (off > 0 ? `oferta_${off}` : 'normal'),
+        monto: Number(p.precio || 0),
+        id_cliente: usuario?.id_cliente || null
+      });
+
       const botonesFicha = agotado
         ? `<button class="btn btn--fantasma btn--bloque" disabled>Agotado</button>`
         : soloCotizar
-        ? `<a class="btn btn--wa btn--bloque" href="${waLink(`¡Hola! Quiero cotizar por mayoreo: ${p.nombre} (${p.unidad})`)}" target="_blank" rel="noopener">Cotizar por WhatsApp</a>`
+        ? `<a class="btn btn--wa btn--bloque" data-wa-cotizar="${p.id}" href="${waLink(`¡Hola! Quiero cotizar por mayoreo: ${p.nombre} (${p.unidad})`)}" target="_blank" rel="noopener">Cotizar por WhatsApp</a>`
         : `<button class="btn btn--primario btn--bloque" id="f-add">Agregar al pedido</button>
            <button class="btn btn--amarillo btn--bloque" id="f-comprar">Comprar ahora</button>`;
 
@@ -349,7 +370,7 @@ export default function TiendaCandy() {
         </nav>
         <div class="ficha__caja">
           <div class="ficha__galeria">
-            <img src="${escapar(imgDe(p))}" alt="${escapar(p.nombre)}" width="420" height="420" onerror="this.src='img/ICONO.png'">
+            <img src="${escapar(imgDe(p))}" alt="${escapar(p.nombre)}" width="420" height="420" onerror="this.src='/img/ICONO.png'">
           </div>
           <div class="ficha__info">
             <p class="ficha__cat">${nombreCat(p.cat)}${p.marca ? ` · ${escapar(p.marca)}` : ''}${p.etiqueta==='top'?' · Más vendido':''}</p>
@@ -398,14 +419,14 @@ export default function TiendaCandy() {
       const btnComprar = $('#f-comprar');
       if (btnComprar) {
         btnComprar.addEventListener('click', ()=>{
-          if (agregar(p.id, cantidadFicha, true)) abrirPago();
+          if (agregar(p.id, cantidadFicha, true, 'ficha_comprar')) abrirPago();
         });
       }
 
       const btnAdd = $('#f-add');
       if (btnAdd) {
         btnAdd.addEventListener('click', function() {
-          if (!agregar(p.id, cantidadFicha)) return;
+          if (!agregar(p.id, cantidadFicha, false, 'ficha')) return;
           const txtOriginal = this.innerHTML;
           this.innerHTML = '¡Agregado! ✔️';
           this.classList.add('btn--agregado');
@@ -431,7 +452,7 @@ export default function TiendaCandy() {
         if (el) setTimeout(()=>el.scrollIntoView({behavior:'smooth'}), 60);
       }
     }
-    window.addEventListener('hashchange', router);
+    window.addEventListener('hashchange', router, { signal });
 
     /* ─────────── CARRITO ─────────── */
     const LLAVE = 'candy_pedido_v2';
@@ -472,7 +493,7 @@ export default function TiendaCandy() {
       };
     }
 
-    function agregar(id, cant=1, callado=false){
+    function agregar(id, cant=1, callado=false, origen='catalogo'){
       const p = PRODUCTOS.find(x=>String(x.id)===String(id));
       if(!p) return false;
       const maxTope = p.tope || 20;
@@ -483,6 +504,21 @@ export default function TiendaCandy() {
       pedido[id] = (pedido[id]||0) + cant;
       guardarPedido(); pintarCarrito();
       if(!callado) avisar(`${p.nombre} agregado`, '🛒');
+
+      if (origen !== 'ajuste_carrito') {
+        registrarMetricaWeb(supabase, {
+          tipo_evento: 'agregar_carrito',
+          id_producto: p.id_db || null,
+          codigo_barras: String(p.id),
+          nombre_producto: p.nombre,
+          categoria: nombreCat(p.cat),
+          valor_texto: origen,
+          cantidad: cant,
+          monto: Number((p.precio * cant).toFixed(2)),
+          id_cliente: usuario?.id_cliente || null
+        });
+      }
+
       $('#cart-n')?.animate([{transform:'scale(1)'},{transform:'scale(1.4)'},{transform:'scale(1)'}], {duration:320, easing:'ease-out'});
       return true;
     }
@@ -491,7 +527,7 @@ export default function TiendaCandy() {
       const { piezas, subtotal, descuento, total, lineas, hayDescuento } = totales();
       $('#carrito-lista').innerHTML = lineas.map(({p,cant,bruto,aplica,neto,faltan})=>`
         <li class="item">
-          <div class="item__foto"><img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='img/ICONO.png'"></div>
+          <div class="item__foto"><img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='/img/ICONO.png'"></div>
           <div>
             <p class="item__n">${escapar(p.nombre)}</p>
             <p class="item__u">${escapar(p.unidad)} · ${dinero(p.precio)} c/u</p>
@@ -533,24 +569,49 @@ export default function TiendaCandy() {
     const abrirCarrito = ()=>{ $('#carrito').hidden=false; $('#velo').hidden=false; document.body.style.overflow='hidden'; $('#carrito-cerrar')?.focus(); };
     const cerrarCarrito= ()=>{ $('#carrito').hidden=true; $('#velo').hidden=true; document.body.style.overflow=''; };
 
-    $('#abrir-carrito').addEventListener('click', abrirCarrito);
-    $('#movil-abrir').addEventListener('click', abrirCarrito);
-    $('#carrito-cerrar').addEventListener('click', cerrarCarrito);
-    $('#carrito-ir').addEventListener('click', ()=>{ cerrarCarrito(); irArriba(); });
-    $('#velo').addEventListener('click', ()=>{ cerrarCarrito(); cerrarFiltros(); });
-    $('#pagar').addEventListener('click', ()=>{ cerrarCarrito(); abrirPago(); });
+    $('#abrir-carrito').addEventListener('click', abrirCarrito, { signal });
+    $('#movil-abrir').addEventListener('click', abrirCarrito, { signal });
+    $('#carrito-cerrar').addEventListener('click', cerrarCarrito, { signal });
+    $('#carrito-ir').addEventListener('click', ()=>{ cerrarCarrito(); irArriba(); }, { signal });
+    $('#velo').addEventListener('click', ()=>{ cerrarCarrito(); cerrarFiltros(); }, { signal });
+    $('#pagar').addEventListener('click', ()=>{ cerrarCarrito(); abrirPago(); }, { signal });
 
     document.addEventListener('keydown', e=>{
       if(e.key!=='Escape') return;
       if(!$('#carrito').hidden) cerrarCarrito();
       else if($('#filtros').classList.contains('on')){ cerrarFiltros(); $('#velo').hidden=true; }
-    });
+    }, { signal });
 
     document.addEventListener('click', e=>{
+      const btnWaCotizar = e.target.closest('[data-wa-cotizar]');
+      if (btnWaCotizar) {
+        const refId = btnWaCotizar.dataset.waCotizar;
+        const prod = PRODUCTOS.find(x => String(x.id) === String(refId));
+        registrarMetricaWeb(supabase, {
+          tipo_evento: 'clic_whatsapp_cotizar',
+          id_producto: prod?.id_db || null,
+          codigo_barras: prod ? String(prod.id) : 'no_encontrado',
+          nombre_producto: prod?.nombre || (filtro.texto ? `Búsqueda: ${filtro.texto}` : 'Consulta producto no listado'),
+          categoria: prod ? nombreCat(prod.cat) : 'Sin resultado',
+          valor_texto: prod ? 'mayoreo_producto' : 'producto_no_encontrado',
+          monto: Number(prod?.precio || 0),
+          id_cliente: usuario?.id_cliente || null
+        });
+        return;
+      }
+
       const btnBanner = e.target.closest('[data-banner-destino]');
       if (btnBanner) {
         e.preventDefault();
         const dest = btnBanner.dataset.bannerDestino || '#catalogo';
+        const tituloBanner = btnBanner.closest('.banner')?.querySelector('h2')?.textContent?.trim() || dest;
+
+        registrarMetricaWeb(supabase, {
+          tipo_evento: 'clic_banner',
+          valor_texto: `${tituloBanner} (${dest})`,
+          id_cliente: usuario?.id_cliente || null
+        });
+
         location.hash = '#/';
 
         if (dest === '#pinata' || dest === '#aguinaldos') {
@@ -579,13 +640,13 @@ export default function TiendaCandy() {
 
       if (e.target.closest('[data-abrir-cuenta]')) {
         cerrarCarrito();
-        abrirCuenta();
+        abrirCuenta('entrar', false);
         return;
       }
 
       const a = e.target.closest('[data-add]');
       if(a){
-        if (!agregar(a.dataset.add)) return;
+        if (!agregar(a.dataset.add, 1, false, 'catalogo')) return;
         const txtOriginal = a.innerHTML;
         a.innerHTML = '¡Agregado! ✔️';
         a.classList.add('btn--agregado');
@@ -593,7 +654,7 @@ export default function TiendaCandy() {
         return;
       }
       const m = e.target.closest('[data-mas]');
-      if(m){ agregar(m.dataset.mas, 1, true); return; }
+      if(m){ agregar(m.dataset.mas, 1, true, 'ajuste_carrito'); return; }
       const n = e.target.closest('[data-menos]');
       if(n){ const id=n.dataset.menos; pedido[id]--; if(pedido[id]<=0) delete pedido[id]; guardarPedido(); pintarCarrito(); return; }
       const x = e.target.closest('[data-borrar]');
@@ -604,7 +665,7 @@ export default function TiendaCandy() {
       if(ic){ e.preventDefault(); filtro.cat=ic.dataset.irCat; filtro.pagina=1; location.hash='#/'; pintarCatalogo(); setTimeout(irArriba,80); return; }
       const io = e.target.closest('[data-ir-oferta]');
       if(io){ filtro.oferta=true; filtro.cat='todos'; filtro.pagina=1; pintarCatalogo(); irArriba(); }
-    });
+    }, { signal });
 
     /* ─────────── BUSCADOR ─────────── */
     const input = $('#q');
@@ -626,7 +687,7 @@ export default function TiendaCandy() {
         sug.innerHTML = hits.length
           ? hits.map((p,i)=>`
               <button class="sug__it" role="option" aria-selected="false" data-id="${p.id}" data-i="${i}">
-                <img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='img/ICONO.png'">
+                <img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='/img/ICONO.png'">
                 <span><span class="sug__n">${escapar(p.nombre)}</span><br>
                       <span class="sug__c">${nombreCat(p.cat)}${p.marca ? ` · ${escapar(p.marca)}` : ''} · ${escapar(p.unidad)}</span></span>
                 <span class="sug__p">${dinero(p.precio)}</span>
@@ -643,8 +704,36 @@ export default function TiendaCandy() {
       sugI = (sugI+paso+it.length)%it.length;
       it.forEach((el,i)=>{ el.classList.toggle('on', i===sugI); el.setAttribute('aria-selected', i===sugI); });
     }
-    input.addEventListener('input', ()=>{ pintarSug(); filtro.texto = input.value; filtro.pagina=1; if(!$('#vista-producto').hidden) location.hash='#/'; pintarCatalogo(); });
-    input.addEventListener('focus', pintarSug);
+    input.addEventListener('input', ()=>{
+      pintarSug();
+      filtro.texto = input.value;
+      filtro.pagina = 1;
+      if(!$('#vista-producto').hidden) location.hash='#/';
+      pintarCatalogo();
+
+      clearTimeout(busquedaTimer);
+      const textoBuscado = input.value.trim();
+      if (textoBuscado.length >= 3) {
+        busquedaTimer = setTimeout(() => {
+          if (signal.aborted) return;
+          const q = limpiar(textoBuscado);
+          if (!q) return;
+          const hits = PRODUCTOS.filter(p => {
+            const heno = limpiar(`${p.nombre} ${p.marca || ''} ${nombreCat(p.cat)} ${p.unidad} ${p.desc || ''}`);
+            return q.split(' ').every(w => heno.includes(w));
+          });
+          if (hits.length === 0 && q !== ultimaBusquedaSinResultado) {
+            ultimaBusquedaSinResultado = q;
+            registrarMetricaWeb(supabase, {
+              tipo_evento: 'busqueda_sin_resultados',
+              valor_texto: textoBuscado,
+              id_cliente: usuario?.id_cliente || null
+            });
+          }
+        }, 1200);
+      }
+    }, { signal });
+    input.addEventListener('focus', pintarSug, { signal });
     input.addEventListener('keydown', e=>{
       if(e.key==='ArrowDown'){ e.preventDefault(); moverSug(1); }
       else if(e.key==='ArrowUp'){ e.preventDefault(); moverSug(-1); }
@@ -653,15 +742,15 @@ export default function TiendaCandy() {
         const it = $$('.sug__it', sug);
         if(sugI>=0 && it[sugI]){ e.preventDefault(); location.hash=`#/producto/${it[sugI].dataset.id}`; cerrarSug(); }
       }
-    });
-    $('#form-busqueda').addEventListener('submit', e=>{ e.preventDefault(); filtro.texto = input.value; cerrarSug(); if(!$('#vista-producto').hidden) location.hash='#/'; pintarCatalogo(); irArriba(); });
+    }, { signal });
+    $('#form-busqueda').addEventListener('submit', e=>{ e.preventDefault(); filtro.texto = input.value; cerrarSug(); if(!$('#vista-producto').hidden) location.hash='#/'; pintarCatalogo(); irArriba(); }, { signal });
     sug.addEventListener('click', e=>{
       const it = e.target.closest('.sug__it');
       if(it){ location.hash=`#/producto/${it.dataset.id}`; cerrarSug(); return; }
       const ch = e.target.closest('.sug__chip');
       if(ch){ input.value=ch.dataset.txt; filtro.texto=ch.dataset.txt; cerrarSug(); if(!$('#vista-producto').hidden) location.hash='#/'; pintarCatalogo(); irArriba(); }
-    });
-    document.addEventListener('click', e=>{ if(!e.target.closest('.buscador')) cerrarSug(); });
+    }, { signal });
+    document.addEventListener('click', e=>{ if(!e.target.closest('.buscador')) cerrarSug(); }, { signal });
 
     /* ─────────── BANNERS ─────────── */
     let banner = 0, bannerTimer;
@@ -702,13 +791,22 @@ export default function TiendaCandy() {
       clearInterval(bannerTimer);
       if(!quieto()) bannerTimer = setInterval(()=>irBanner(banner+1), 6500);
     }
-    $('#banner-prev').addEventListener('click', ()=>{ irBanner(banner-1); autoBanner(); });
-    $('#banner-next').addEventListener('click', ()=>{ irBanner(banner+1); autoBanner(); });
-    $('#banner-dots').addEventListener('click', e=>{ const b=e.target.closest('[data-b]'); if(b){ irBanner(+b.dataset.b); autoBanner(); } });
+    $('#banner-prev').addEventListener('click', ()=>{ irBanner(banner-1); autoBanner(); }, { signal });
+    $('#banner-next').addEventListener('click', ()=>{ irBanner(banner+1); autoBanner(); }, { signal });
+    $('#banner-dots').addEventListener('click', e=>{ const b=e.target.closest('[data-b]'); if(b){ irBanner(+b.dataset.b); autoBanner(); } }, { signal });
 
     function pintarEstantes(){
-      const top = PRODUCTOS.filter(p=>p.etiqueta==='top' || p.antes).slice(0,10);
-      const off = PRODUCTOS.filter(p=>p.antes).slice(0,10);
+      const conVentas = PRODUCTOS
+        .filter(p => Number(p.ventasReales || 0) > 0)
+        .sort((a, b) => Number(b.ventasReales) - Number(a.ventasReales));
+
+      const idsYaIncluidos = new Set(conVentas.map(p => String(p.id)));
+      const respaldo = PRODUCTOS.filter(
+        p => !idsYaIncluidos.has(String(p.id)) && (p.etiqueta === 'top' || p.antes)
+      );
+
+      const top = [...conVentas, ...respaldo].slice(0, 10);
+      const off = PRODUCTOS.filter(p => p.antes).slice(0, 10);
       $('#e-top').innerHTML = top.map(tarjeta).join('');
       $('#e-off').innerHTML = off.map(tarjeta).join('');
     }
@@ -716,7 +814,7 @@ export default function TiendaCandy() {
     $$('[data-scroll]').forEach(b=>b.addEventListener('click',()=>{
       const pista = document.getElementById(b.dataset.scroll);
       pista.scrollBy({left: (+b.dataset.dir) * pista.clientWidth * .8, behavior:'smooth'});
-    }));
+    }, { signal }));
 
     function pintarRubros(){
       $('#rubros').innerHTML = CATEGORIAS.map(c=>{
@@ -738,7 +836,7 @@ export default function TiendaCandy() {
     function pintarMarcas(){
       const uno = MARCAS.map(m=>`
         <span class="marca" style="--c:${m.color}">
-          <img src="img/${escapar(m.archivo)}" alt="${escapar(m.nombre)}" decoding="async"
+          <img src="/img/${encodeURIComponent(m.archivo)}" alt="${escapar(m.nombre)}" decoding="async"
                onerror="this.closest('.marca').classList.add('sin-foto');this.remove()">
           <b>${escapar(m.nombre)}</b>
         </span>`).join('');
@@ -769,7 +867,7 @@ export default function TiendaCandy() {
       const lista = PRODUCTOS.filter(p => (enBolsa() ? sirveParaBolsa(p) : p.cat !== 'fiesta') && (p.stock === undefined || p.stock > 0));
       $('#dulces').innerHTML = lista.map(p=>`
         <button class="dulce" data-pinata="${p.id}" aria-label="Echar ${escapar(p.nombre)}">
-          <img src="${escapar(imgDe(p))}" alt="" loading="lazy" width="46" height="46" onerror="this.src='img/ICONO.png'">
+          <img src="${escapar(imgDe(p))}" alt="" loading="lazy" width="46" height="46" onerror="this.src='/img/ICONO.png'">
           <span>${escapar(p.nombre)}</span>
           <b>${enBolsa() ? dinero(p.precio / p.piezas) + ' c/u' : dinero(p.precio)}</b>
         </button>`).join('');
@@ -854,7 +952,7 @@ export default function TiendaCandy() {
         const p = PRODUCTOS.find(x=>String(x.id)===String(id));
         const detalle = enBolsa() ? `<small>${paq[id]} × ${escapar(p.unidad)}</small>` : '';
         return `<li class="pieza">
-          <img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='img/ICONO.png'">
+          <img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='/img/ICONO.png'">
           <span>${escapar(p.nombre)}${detalle}</span><b>${cont[id]}${enBolsa()?' c/u':''}</b>
           <button data-sacar="${id}" aria-label="Sacar ${escapar(p.nombre)}">✕</button></li>`;
       }).join('');
@@ -902,9 +1000,9 @@ export default function TiendaCandy() {
       pintarPinata();
     }
 
-    $$('.modo').forEach(b=>b.addEventListener('click', ()=>cambiarModo(b.dataset.modo)));
-    $$('[data-bolsas]').forEach(b=>b.addEventListener('click', ()=>fijarBolsas(nBolsas + Number(b.dataset.bolsas))));
-    $('#bolsa-n').addEventListener('change', e=>fijarBolsas(e.target.value));
+    $$('.modo').forEach(b=>b.addEventListener('click', ()=>cambiarModo(b.dataset.modo), { signal }));
+    $$('[data-bolsas]').forEach(b=>b.addEventListener('click', ()=>fijarBolsas(nBolsas + Number(b.dataset.bolsas)), { signal }));
+    $('#bolsa-n').addEventListener('change', e=>fijarBolsas(e.target.value), { signal });
 
     $('#dulces').addEventListener('click', e=>{
       const b = e.target.closest('[data-pinata]');
@@ -921,28 +1019,37 @@ export default function TiendaCandy() {
       if(piezas === meta){
         avisar(enBolsa() ? '¡Tu bolsita ya va bien surtida!' : '¡Tu piñata ya está bien llena!', '🎉');
       }
-    });
+    }, { signal });
 
     $('#pinata-lista').addEventListener('click', e=>{
       const x = e.target.closest('[data-sacar]');
       if(x){ delete contenido()[x.dataset.sacar]; pintarPinata(); }
-    });
+    }, { signal });
     $('#pinata-vaciar').addEventListener('click', ()=>{
       if(enBolsa()){ bolsa={}; avisar('Bolsita vacía','🎁'); }
       else{ pinata={}; avisar('Piñata vacía','🪅'); }
       pintarPinata();
-    });
+    }, { signal });
 
     function pinataAlPedido(){
-      Object.entries(paquetes()).forEach(([id,c])=>{ pedido[id]=(pedido[id]||0)+c; });
+      const paq = paquetes();
+      Object.entries(paq).forEach(([id,c])=>{ pedido[id]=(pedido[id]||0)+c; });
       guardarPedido(); pintarCarrito();
+
+      registrarMetricaWeb(supabase, {
+        tipo_evento: 'conversion_pinata',
+        valor_texto: enBolsa() ? `aguinaldos_${nBolsas}` : 'pinata',
+        cantidad: sumar(paq),
+        monto: Number(importeDe(paq).toFixed(2)),
+        id_cliente: usuario?.id_cliente || null
+      });
     }
-    $('#pinata-comprar').addEventListener('click', ()=>{ pinataAlPedido(); abrirPago(); });
+    $('#pinata-comprar').addEventListener('click', ()=>{ pinataAlPedido(); abrirPago(); }, { signal });
     $('#pinata-add').addEventListener('click', ()=>{
       pinataAlPedido();
       avisar(enBolsa() ? `Tus ${nBolsas} aguinaldos pasaron al pedido` : 'Tu piñata pasó al pedido','🎉');
       abrirCarrito();
-    });
+    }, { signal });
 
     /* ─────────── PREGUNTAS, MENÚ MÓVIL Y WHATSAPP ─────────── */
     $$('.qa__q').forEach(b=>b.addEventListener('click',()=>{
@@ -950,7 +1057,7 @@ export default function TiendaCandy() {
       const abierto = bloque.classList.contains('on');
       $$('.qa').forEach(q=>{ q.classList.remove('on'); $('.qa__q',q).setAttribute('aria-expanded','false'); });
       if(!abierto){ bloque.classList.add('on'); b.setAttribute('aria-expanded','true'); }
-    }));
+    }, { signal }));
 
     const menuAbierto = ()=> $('#catnav-links').classList.contains('on');
     const altoHead = ()=> document.documentElement.style
@@ -963,13 +1070,13 @@ export default function TiendaCandy() {
       altoHead();
       const on = $('#catnav-links').classList.toggle('on');
       $('#burger').setAttribute('aria-expanded', on);
-    });
-    $('#catnav-links').addEventListener('click', cerrarMenu);
-    window.addEventListener('scroll', ()=>{ if(menuAbierto()) altoHead(); }, {passive:true});
-    window.addEventListener('resize', ()=>{ if(menuAbierto()) altoHead(); });
+    }, { signal });
+    $('#catnav-links').addEventListener('click', cerrarMenu, { signal });
+    window.addEventListener('scroll', ()=>{ if(menuAbierto()) altoHead(); }, { passive: true, signal });
+    window.addEventListener('resize', ()=>{ if(menuAbierto()) altoHead(); }, { signal });
     document.addEventListener('click', e=>{
       if(menuAbierto() && !e.target.closest('#catnav, #burger')) cerrarMenu();
-    });
+    }, { signal });
 
     const M_GENERAL = '¡Hola! 👋 Vi su tienda en línea y me gustaría más información.';
     $('#wa-head').href  = waLink(M_GENERAL);
@@ -1102,7 +1209,7 @@ export default function TiendaCandy() {
       entrar:    { panel:'#form-entrar',    tabs:true,  t:'¡Qué gusto verte!',
                    s:'Entra y tus datos se llenan solos al pagar.' },
       crear:     { panel:'#form-crear',     tabs:true,  t:'Crea tu cuenta',
-                   s:'Toma un minuto y ya no tendrás que escribir tus datos en cada compra.' },
+                   s:'Toma un minuto y podrás finalizar tu compra y dar seguimiento a tus pedidos.' },
       recuperar: { panel:'#form-recuperar', tabs:false, t:'Recupera tu contraseña',
                    s:'Escribe tu correo y te mandamos un enlace para crear una nueva.' },
       perfil:    { panel:'#cuenta-perfil',  tabs:false, t:'', s:'Esta es tu cuenta de Dulcerías Candy.' }
@@ -1177,8 +1284,19 @@ export default function TiendaCandy() {
         b.setAttribute('aria-selected', on);
         b.tabIndex = on ? 0 : -1;
       });
-      $('#cuenta-t').textContent   = v === 'perfil' ? `Hola, ${primerNombre(usuario.nombre)}` : cfg.t;
-      $('#cuenta-sub').textContent = cfg.s;
+      $('#cuenta-t').textContent =
+        v === 'perfil'
+          ? `Hola, ${primerNombre(usuario.nombre)}`
+          : pendienteIrAPago && (v === 'entrar' || v === 'crear')
+          ? (v === 'crear' ? 'Crea tu cuenta para continuar' : 'Inicia sesión para finalizar tu compra')
+          : cfg.t;
+
+      $('#cuenta-sub').textContent =
+        pendienteIrAPago && (v === 'entrar' || v === 'crear')
+          ? (v === 'crear'
+              ? 'Regístrate en un minuto y enseguida te llevamos a concluir tu pedido.'
+              : 'Tu carrito está guardado. Entra con tu cuenta o regístrate para completar tu compra.')
+          : cfg.s;
 
       $$('form', dlg).forEach(limpiarErrores);
       if (v === 'recuperar'){ $('#recuperar-pasos').hidden = false; $('#recuperar-ok').hidden = true; }
@@ -1190,14 +1308,16 @@ export default function TiendaCandy() {
       }
     }
 
-    function abrirCuenta(v = 'entrar'){
+    function abrirCuenta(v = 'entrar', desdeCheckout = false){
       if (usuario) v = 'perfil';
+      if (!desdeCheckout) pendienteIrAPago = false;
       if (!dlg.open){ dlg.showModal(); document.body.style.overflow = 'hidden'; }
       vistaCuenta(v);
     }
     dlg.addEventListener('close', () => {
-      if ($('#carrito').hidden) document.body.style.overflow = '';
-    });
+      pendienteIrAPago = false;
+      if ($('#carrito').hidden && !dlgPago.open) document.body.style.overflow = '';
+    }, { signal });
 
     function pintarPerfil(){
       $('#perfil-avatar').textContent = inicial(usuario.nombre);
@@ -1216,18 +1336,25 @@ export default function TiendaCandy() {
 
       $('#carrito-cuenta').innerHTML = usuario
         ? `<span aria-hidden="true">👤</span> Pedido a nombre de <b>${escapar(usuario.nombre)}</b>`
-        : `¿Tienes cuenta? <button type="button" class="link" data-abrir-cuenta>Inicia sesión</button> y tus datos se llenan solos al pagar.`;
+        : `Para finalizar tu compra te pediremos <button type="button" class="link" data-abrir-cuenta>iniciar sesión o crear una cuenta</button>.`;
     }
 
     function entrar(u, saludo){
       usuario = { id_cliente: u.id_cliente || null, nombre: u.nombre, correo: u.correo, tel: u.tel || '' };
       guardarJSON(LLAVE_SESION, usuario);
       pintarCuenta();
+
+      const continuarPago = pendienteIrAPago;
+      pendienteIrAPago = false;
       dlg.close();
       avisar(saludo, '👋');
+
+      if (continuarPago && totales().piezas > 0) {
+        setTimeout(() => abrirPago(), 120);
+      }
     }
 
-    $('#abrir-cuenta').addEventListener('click', () => abrirCuenta());
+    $('#abrir-cuenta').addEventListener('click', () => abrirCuenta('entrar', false), { signal });
 
     dlg.addEventListener('click', e => {
       if (e.target === dlg || e.target.closest('[data-cerrar-cuenta]')){ dlg.close(); return; }
@@ -1243,23 +1370,23 @@ export default function TiendaCandy() {
       }
       const v = e.target.closest('[data-vista]');
       if (v) vistaCuenta(v.dataset.vista);
-    });
+    }, { signal });
 
     $('#cuenta-tabs').addEventListener('keydown', e => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       const v = $('#tab-entrar').getAttribute('aria-selected') === 'true' ? 'crear' : 'entrar';
       vistaCuenta(v);
       $(`#cuenta-tabs [data-vista="${v}"]`).focus();
-    });
+    }, { signal });
 
     dlg.addEventListener('input', e => {
       const inp = e.target;
       if (inp.dataset.regla && inp.getAttribute('aria-invalid') === 'true' && !revisar(inp)) marcar(inp, '');
-    });
+    }, { signal });
     dlg.addEventListener('focusout', e => {
       const inp = e.target;
       if (inp.dataset && inp.dataset.regla && inp.value) marcar(inp, revisar(inp));
-    });
+    }, { signal });
 
     $('#form-entrar').addEventListener('submit', async e => {
       e.preventDefault();
@@ -1267,7 +1394,7 @@ export default function TiendaCandy() {
       const d = validar(f); if (!d) return;
       const r = await conEspera(f, () => API.iniciar({ correo: d.correo.trim(), clave: d.clave }));
       if (r.ok){ f.reset(); entrar(r.valor, `¡Hola de nuevo, ${primerNombre(r.valor.nombre)}!`); }
-    });
+    }, { signal });
 
     $('#form-crear').addEventListener('submit', async e => {
       e.preventDefault();
@@ -1281,7 +1408,7 @@ export default function TiendaCandy() {
         promos: $('#c-promos').checked
       }));
       if (r.ok){ f.reset(); entrar(r.valor, `¡Bienvenido, ${primerNombre(r.valor.nombre)}! Tu cuenta está lista`); }
-    });
+    }, { signal });
 
     $('#form-recuperar').addEventListener('submit', async e => {
       e.preventDefault();
@@ -1294,9 +1421,9 @@ export default function TiendaCandy() {
         $('#recuperar-ok').hidden = false;
         f.reset();
       }
-    });
+    }, { signal });
 
-    $('#perfil-pedido').addEventListener('click', () => { dlg.close(); abrirCarrito(); });
+    $('#perfil-pedido').addEventListener('click', () => { dlg.close(); abrirCarrito(); }, { signal });
     $('#cerrar-sesion').addEventListener('click', async () => {
       await API.salir();
       usuario = null;
@@ -1304,17 +1431,18 @@ export default function TiendaCandy() {
       pintarCuenta();
       dlg.close();
       avisar('Cerraste sesión. ¡Vuelve pronto!', '👋');
-    });
+    }, { signal });
 
     (async () => {
-      const { data: authData } = await supabase.auth.getUser();
-      if (!authData?.user) return;
-      const { data: cli } = await supabase
-        .from('tbl_clientes')
-        .select('*')
-        .eq('id_cliente', authData.user.id)
-        .maybeSingle();
-      if (cli) {
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        if (signal.aborted || !authData?.user) return;
+        const { data: cli } = await supabase
+          .from('tbl_clientes')
+          .select('*')
+          .eq('id_cliente', authData.user.id)
+          .maybeSingle();
+        if (signal.aborted || !cli) return;
         usuario = {
           id_cliente: cli.id_cliente,
           nombre: cli.nombre_completo,
@@ -1323,7 +1451,7 @@ export default function TiendaCandy() {
         };
         guardarJSON(LLAVE_SESION, usuario);
         pintarCuenta();
-      }
+      } catch (_) {}
     })();
 
     /* ─────────── FINALIZAR COMPRA (tbl_pedidos y tbl_detalle_pedidos) ─────────── */
@@ -1389,7 +1517,6 @@ export default function TiendaCandy() {
       }
     });
 
-    // Regla de corte 4:30 PM (hora Puebla) para turno_surtido
     function calcularTurnoSurtido() {
       const partes = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'America/Mexico_City',
@@ -1416,6 +1543,10 @@ export default function TiendaCandy() {
     }
 
     async function enviarPedido({ cliente, metodo, resumen, tarjeta }) {
+      if (!usuario) {
+        throw new Error('Debes iniciar sesión o crear tu cuenta para confirmar el pedido.');
+      }
+
       const { folio, codigo_qr } = generarFolioYQR();
       const turno_surtido = calcularTurnoSurtido();
 
@@ -1423,13 +1554,12 @@ export default function TiendaCandy() {
       const marca = tarjeta ? marcaTarjeta(numLimpio) : null;
       const ultimos = tarjeta ? numLimpio.slice(-4) : null;
 
-      // 1. Insertar encabezado en tbl_pedidos
       const { data: pedidoCreado, error: errPedido } = await supabase
         .from('tbl_pedidos')
         .insert([{
           folio,
           codigo_qr,
-          id_cliente: usuario?.id_cliente || null,
+          id_cliente: usuario.id_cliente || null,
           cliente_nombre: cliente.nombre,
           cliente_correo: cliente.correo,
           cliente_telefono: cliente.tel,
@@ -1457,7 +1587,6 @@ export default function TiendaCandy() {
         throw new Error('No pudimos registrar tu pedido: ' + errPedido.message);
       }
 
-      // 2. Insertar partidas en tbl_detalle_pedidos
       const filasDetalle = resumen.lineas.map(l => ({
         id_pedido: pedidoCreado.id_pedido,
         id_producto: l.p.id_db || null,
@@ -1480,8 +1609,7 @@ export default function TiendaCandy() {
         throw new Error('Tu pedido se creó pero hubo un problema guardando el detalle: ' + errDetalle.message);
       }
 
-      // 3. Si el cliente tiene cuenta activa, guardar su dirección/sucursal preferida en tbl_clientes
-      if (usuario?.id_cliente) {
+      if (usuario.id_cliente) {
         await supabase
           .from('tbl_clientes')
           .update({
@@ -1520,7 +1648,7 @@ export default function TiendaCandy() {
       const c = cuentas();
       $('#pr-lista').innerHTML = c.lineas.map(({p, cant, bruto, aplica, neto}) => `
         <li class="pr__item">
-          <span class="pr__foto"><img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='img/ICONO.png'"><b>${cant}</b></span>
+          <span class="pr__foto"><img src="${escapar(imgDe(p))}" alt="" loading="lazy" onerror="this.src='/img/ICONO.png'"><b>${cant}</b></span>
           <span class="pr__n">${escapar(p.nombre)}<small>${escapar(p.unidad)}</small></span>
           <span class="pr__p">${dinero(aplica ? neto : bruto)}</span>
         </li>`).join('');
@@ -1584,9 +1712,9 @@ export default function TiendaCandy() {
       const guardado = leerJSON(LLAVE_ENTREGA, {}) || {};
       const datos = { ...guardado };
       if (usuario){
-        datos.nombre = datos.nombre || usuario.nombre;
-        datos.correo = datos.correo || usuario.correo;
-        datos.tel    = datos.tel    || usuario.tel;
+        datos.nombre = usuario.nombre || datos.nombre;
+        datos.correo = usuario.correo || datos.correo;
+        datos.tel    = usuario.tel    || datos.tel;
       }
       const f = $('#pago-entrega');
       ['nombre','correo','tel','calle','colonia','cp','ref'].forEach(k => {
@@ -1601,7 +1729,30 @@ export default function TiendaCandy() {
     }
 
     function abrirPago(){
-      if (totales().piezas === 0){ avisar('Tu pedido está vacío', '🛒'); return; }
+      const t = totales();
+      if (t.piezas === 0){ avisar('Tu pedido está vacío', '🛒'); return; }
+
+      // Candado obligatorio: iniciar sesión o registrarse antes de finalizar la compra
+      if (!usuario) {
+        pendienteIrAPago = true;
+        registrarMetricaWeb(supabase, {
+          tipo_evento: 'checkout_requiere_login',
+          valor_texto: 'Solicitó cuenta antes de pagar',
+          cantidad: t.piezas,
+          monto: t.total
+        });
+        avisar('Inicia sesión o crea tu cuenta para finalizar tu compra', '🔒');
+        abrirCuenta('entrar', true);
+        return;
+      }
+
+      registrarMetricaWeb(supabase, {
+        tipo_evento: 'inicio_checkout',
+        cantidad: t.piezas,
+        monto: t.total,
+        id_cliente: usuario.id_cliente || null
+      });
+
       precargar();
       $$('form', dlgPago).forEach(limpiarErrores);
       pintarEntrega();
@@ -1612,9 +1763,9 @@ export default function TiendaCandy() {
     }
 
     dlgPago.addEventListener('close', () => {
-      if ($('#carrito').hidden) document.body.style.overflow = '';
+      if ($('#carrito').hidden && !dlg.open) document.body.style.overflow = '';
       if (!$('#pago-listo').hidden) irPaso(1);
-    });
+    }, { signal });
 
     dlgPago.addEventListener('click', e => {
       if (e.target === dlgPago || e.target.closest('[data-cerrar-pago]')){
@@ -1623,23 +1774,23 @@ export default function TiendaCandy() {
       }
       const ir = e.target.closest('[data-paso-ir]');
       if (ir) irPaso(+ir.dataset.pasoIr);
-    });
+    }, { signal });
 
-    matchMedia('(min-width: 861px)').addEventListener('change', e => { if (e.matches) $('#pago-resumen').open = true; });
+    matchMedia('(min-width: 861px)').addEventListener('change', e => { if (e.matches) $('#pago-resumen').open = true; }, { signal });
 
     dlgPago.addEventListener('change', e => {
       if (e.target.name === 'entrega') pintarEntrega();
       if (e.target.name === 'metodo')  pintarMetodo();
-    });
+    }, { signal });
 
     dlgPago.addEventListener('input', e => {
       const inp = e.target;
       if (inp.dataset.regla && inp.getAttribute('aria-invalid') === 'true' && !revisar(inp)) marcar(inp, '');
-    });
+    }, { signal });
     dlgPago.addEventListener('focusout', e => {
       const inp = e.target;
       if (inp.dataset && inp.dataset.regla && inp.value) marcar(inp, revisar(inp));
-    });
+    }, { signal });
 
     $('#pago-entrega').addEventListener('submit', e => {
       e.preventDefault();
@@ -1673,7 +1824,7 @@ export default function TiendaCandy() {
       pintarMetodo();
       pintarResumen();
       irPaso(2);
-    });
+    }, { signal });
 
     const tNum = $('#t-num'), tNom = $('#t-nombre'), tVen = $('#t-venc'), tCvv = $('#t-cvv');
 
@@ -1700,18 +1851,18 @@ export default function TiendaCandy() {
       [...n.slice(0, amex ? 15 : 16)].forEach((d, i) => { if (corte.includes(i)) txt += ' '; txt += d; });
       tNum.value = txt;
       pintarTarjeta();
-    });
+    }, { signal });
     tVen.addEventListener('input', e => {
       let n = soloDigitos(tVen.value).slice(0, 4);
       if (n.length === 1 && +n > 1) n = '0' + n;
       tVen.value = n.length > 2 || (n.length === 2 && e.inputType !== 'deleteContentBackward')
         ? n.slice(0,2) + '/' + n.slice(2) : n;
       pintarTarjeta();
-    });
-    tCvv.addEventListener('input', () => { tCvv.value = soloDigitos(tCvv.value).slice(0, 4); pintarTarjeta(); });
-    tNom.addEventListener('input', pintarTarjeta);
-    tCvv.addEventListener('focus', () => $('#tarjeta-vista').classList.add('volteada'));
-    tCvv.addEventListener('blur',  () => $('#tarjeta-vista').classList.remove('volteada'));
+    }, { signal });
+    tCvv.addEventListener('input', () => { tCvv.value = soloDigitos(tCvv.value).slice(0, 4); pintarTarjeta(); }, { signal });
+    tNom.addEventListener('input', pintarTarjeta, { signal });
+    tCvv.addEventListener('focus', () => $('#tarjeta-vista').classList.add('volteada'), { signal });
+    tCvv.addEventListener('blur',  () => $('#tarjeta-vista').classList.remove('volteada'), { signal });
 
     $('#pago-metodo').addEventListener('submit', async e => {
       e.preventDefault();
@@ -1734,7 +1885,7 @@ export default function TiendaCandy() {
       if (!r.ok){ pintarBotonPago(); return; }
 
       terminar(r.valor, metodo, c);
-    });
+    }, { signal });
 
     function terminar({ folio, codigo_qr, turno_surtido, marca, ultimos }, metodo, c){
       const ent = entregaActual;
@@ -1784,151 +1935,175 @@ export default function TiendaCandy() {
       if (!e.target.closest('#copiar-clabe')) return;
       const clabe = soloDigitos($('#spei-clabe').textContent);
       navigator.clipboard?.writeText(clabe).then(() => avisar('CLABE copiada', '📋'), () => {});
-    });
+    }, { signal });
 
     /* ─────────── SINCRONIZACIÓN EN VIVO CON SUPABASE ─────────── */
     async function sincronizarConSupabase() {
-      const ahora = new Date();
+      try {
+        const ahora = new Date();
 
-      const { data: prodsDB } = await supabase
-        .from('tbl_productos')
-        .select('*, tbl_categorias(slug)')
-        .order('id_producto');
+        const [{ data: prodsDB }, { data: ventasDB }] = await Promise.all([
+          supabase
+            .from('tbl_productos')
+            .select('*, tbl_categorias(slug)')
+            .order('id_producto'),
+          supabase
+            .from('vw_mas_vendidos')
+            .select('id_producto, codigo_barras, total_vendido')
+        ]);
 
-      if (prodsDB && prodsDB.length > 0) {
-        const catalogoReconstruido = PRODUCTOS_BASE.map(item => ({ ...item }));
-        const idsOcultosWeb = new Set();
-        const nombresOcultosWeb = new Set();
+        if (signal.aborted) return;
 
-        prodsDB.forEach(db => {
-          const idProd = db.codigo_barras || String(db.id_producto);
-          const nombreNorm = (db.nombre_dulce || '').trim().toLowerCase();
-
-          // Ocultar en la tienda web si está dado de baja o en modo Borrador (Solo SIGE Candy)
-          if (db.activo === false || db.publicado_web === false) {
-            idsOcultosWeb.add(idProd);
-            if (nombreNorm) nombresOcultosWeb.add(nombreNorm);
-            return;
-          }
-
-          // Validar vigencia automática del descuento (corte 23:59)
-          let descPct = Number(db.porcentaje_descuento || 0);
-          if (descPct > 0) {
-            const inicio = db.descuento_inicio ? new Date(db.descuento_inicio) : null;
-            const fin = db.descuento_fin ? new Date(db.descuento_fin) : null;
-            if ((inicio && ahora < inicio) || (fin && ahora > fin)) {
-              descPct = 0;
-            }
-          }
-
-          const precioBase = Number(db.precio_unitario || 0);
-          const precioConDescuento = descPct > 0
-            ? Number((precioBase * (1 - descPct / 100)).toFixed(2))
-            : precioBase;
-          const precioAntes = descPct > 0 ? precioBase : null;
-
-          const idx = catalogoReconstruido.findIndex(
-            p => p.id === idProd || p.nombre.toLowerCase() === nombreNorm
-          );
-          const piezasBase = idx >= 0 ? catalogoReconstruido[idx].piezas : 0;
-
-          const marcaLimpia =
-            db.marca && db.marca !== 'Sin marca / Genérico'
-              ? db.marca
-              : '';
-
-          const etiquetaReal =
-            db.etiqueta_web && db.etiqueta_web !== 'normal'
-              ? db.etiqueta_web
-              : null;
-
-          const itemMapeado = {
-            id_db: db.id_producto,
-            id: idProd,
-            nombre: db.nombre_dulce,
-            marca: marcaLimpia,
-            unidad: db.presentacion || 'Pieza',
-            precio: precioConDescuento,
-            antes: precioAntes,
-            descuentoPct: descPct,
-            cat: db.tbl_categorias?.slug || 'gomitas',
-            etiqueta: etiquetaReal,
-            piezas: Number(db.piezas_por_paquete) > 0 ? Number(db.piezas_por_paquete) : piezasBase,
-            stock: db.stock_web,
-            tope: db.tope_maximo_compra || 20,
-            es_transaccional: db.es_transaccional,
-            img: db.imagen_url || null,
-            desc: db.descripcion || ''
-          };
-
-          if (idx >= 0) {
-            catalogoReconstruido[idx] = {
-              ...catalogoReconstruido[idx],
-              ...itemMapeado,
-              desc: itemMapeado.desc || catalogoReconstruido[idx].desc || ''
-            };
-          } else {
-            catalogoReconstruido.unshift(itemMapeado);
-          }
-        });
-
-        PRODUCTOS = catalogoReconstruido.filter(
-          p => !idsOcultosWeb.has(String(p.id)) && !nombresOcultosWeb.has(p.nombre.toLowerCase())
-        );
-      }
-
-      const { data: bannersDB } = await supabase
-        .from('tbl_promociones_banners')
-        .select('*')
-        .eq('estado', 'Activo')
-        .order('id_promocion');
-
-      if (bannersDB) {
-        const bannersVigentes = bannersDB.filter(b => {
-          const inicio = b.fecha_inicio ? new Date(b.fecha_inicio) : null;
-          const fin = b.fecha_expiracion ? new Date(b.fecha_expiracion) : null;
-          if (inicio && ahora < inicio) return false;
-          if (fin && ahora > fin) return false;
-          return true;
-        });
-
-        if (bannersVigentes.length > 0) {
-          BANNERS = bannersVigentes.map((b, i) => {
-            const partes = (b.leyenda_exclusividad || '').split('|').map(s => s.trim());
-            const destinoGuardado = partes[2] || (b.imagen_banner_url?.startsWith('#') ? b.imagen_banner_url : '#catalogo');
-            return {
-              clase: `banner--${(i % 3) + 1}`,
-              tag: partes[0] || 'Promoción',
-              titulo: b.titulo,
-              texto: partes[1] || b.leyenda_exclusividad || '',
-              cta: 'Ver promoción',
-              destino: destinoGuardado,
-              imagen_banner_url: b.imagen_banner_url || ''
-            };
+        const mapaVentas = new Map();
+        if (ventasDB) {
+          ventasDB.forEach(v => {
+            const total = Number(v.total_vendido || 0);
+            if (v.id_producto) mapaVentas.set(`id:${v.id_producto}`, total);
+            if (v.codigo_barras) mapaVentas.set(`cod:${String(v.codigo_barras).trim()}`, total);
           });
-        } else {
-          BANNERS = [...BANNERS_RESPALDO];
         }
-      }
 
-      if (banner >= BANNERS.length) banner = 0;
+        if (prodsDB && prodsDB.length > 0) {
+          const catalogoReconstruido = PRODUCTOS_BASE.map(item => ({ ...item }));
+          const idsOcultosWeb = new Set();
+          const nombresOcultosWeb = new Set();
 
-      pintarBanners();
-      pintarRubros();
-      pintarEstantes();
-      pintarDulces();
-      pintarCatalogo();
-      pintarCarrito();
-      pintarPinata();
+          prodsDB.forEach(db => {
+            const idProd = db.codigo_barras || String(db.id_producto);
+            const nombreNorm = (db.nombre_dulce || '').trim().toLowerCase();
 
-      const m = location.hash.match(/^#\/producto\/(.+)$/);
-      if (m) {
-        const prodAbierto = PRODUCTOS.find(x => String(x.id) === String(m[1]));
-        if (prodAbierto) {
-          pintarFicha(prodAbierto);
-        } else {
-          location.hash = '#/';
+            if (db.activo === false || db.publicado_web === false) {
+              idsOcultosWeb.add(idProd);
+              if (nombreNorm) nombresOcultosWeb.add(nombreNorm);
+              return;
+            }
+
+            let descPct = Number(db.porcentaje_descuento || 0);
+            if (descPct > 0) {
+              const inicio = db.descuento_inicio ? new Date(db.descuento_inicio) : null;
+              const fin = db.descuento_fin ? new Date(db.descuento_fin) : null;
+              if ((inicio && ahora < inicio) || (fin && ahora > fin)) {
+                descPct = 0;
+              }
+            }
+
+            const precioBase = Number(db.precio_unitario || 0);
+            const precioConDescuento = descPct > 0
+              ? Number((precioBase * (1 - descPct / 100)).toFixed(2))
+              : precioBase;
+            const precioAntes = descPct > 0 ? precioBase : null;
+
+            const idx = catalogoReconstruido.findIndex(
+              p => p.id === idProd || p.nombre.toLowerCase() === nombreNorm
+            );
+            const piezasBase = idx >= 0 ? catalogoReconstruido[idx].piezas : 0;
+
+            const marcaLimpia =
+              db.marca && db.marca !== 'Sin marca / Genérico'
+                ? db.marca
+                : '';
+
+            const etiquetaReal =
+              db.etiqueta_web && db.etiqueta_web !== 'normal'
+                ? db.etiqueta_web
+                : null;
+
+            const itemMapeado = {
+              id_db: db.id_producto,
+              id: idProd,
+              nombre: db.nombre_dulce,
+              marca: marcaLimpia,
+              unidad: db.presentacion || 'Pieza',
+              precio: precioConDescuento,
+              antes: precioAntes,
+              descuentoPct: descPct,
+              cat: db.tbl_categorias?.slug || 'gomitas',
+              etiqueta: etiquetaReal,
+              ventasReales:
+                mapaVentas.get(`id:${db.id_producto}`) ??
+                mapaVentas.get(`cod:${String(idProd).trim()}`) ??
+                0,
+              piezas: Number(db.piezas_por_paquete) > 0 ? Number(db.piezas_por_paquete) : piezasBase,
+              stock: db.stock_web,
+              tope: db.tope_maximo_compra || 20,
+              es_transaccional: db.es_transaccional,
+              img: db.imagen_url || null,
+              desc: db.descripcion || ''
+            };
+
+            if (idx >= 0) {
+              catalogoReconstruido[idx] = {
+                ...catalogoReconstruido[idx],
+                ...itemMapeado,
+                desc: itemMapeado.desc || catalogoReconstruido[idx].desc || ''
+              };
+            } else {
+              catalogoReconstruido.unshift(itemMapeado);
+            }
+          });
+
+          PRODUCTOS = catalogoReconstruido.filter(
+            p => !idsOcultosWeb.has(String(p.id)) && !nombresOcultosWeb.has(p.nombre.toLowerCase())
+          );
         }
+
+        const { data: bannersDB } = await supabase
+          .from('tbl_promociones_banners')
+          .select('*')
+          .eq('estado', 'Activo')
+          .order('id_promocion');
+
+        if (signal.aborted) return;
+
+        if (bannersDB) {
+          const bannersVigentes = bannersDB.filter(b => {
+            const inicio = b.fecha_inicio ? new Date(b.fecha_inicio) : null;
+            const fin = b.fecha_expiracion ? new Date(b.fecha_expiracion) : null;
+            if (inicio && ahora < inicio) return false;
+            if (fin && ahora > fin) return false;
+            return true;
+          });
+
+          if (bannersVigentes.length > 0) {
+            BANNERS = bannersVigentes.map((b, i) => {
+              const partes = (b.leyenda_exclusividad || '').split('|').map(s => s.trim());
+              const destinoGuardado = partes[2] || (b.imagen_banner_url?.startsWith('#') ? b.imagen_banner_url : '#catalogo');
+              return {
+                clase: `banner--${(i % 3) + 1}`,
+                tag: partes[0] || 'Promoción',
+                titulo: b.titulo,
+                texto: partes[1] || b.leyenda_exclusividad || '',
+                cta: 'Ver promoción',
+                destino: destinoGuardado,
+                imagen_banner_url: b.imagen_banner_url || ''
+              };
+            });
+          } else {
+            BANNERS = [...BANNERS_RESPALDO];
+          }
+        }
+
+        if (banner >= BANNERS.length) banner = 0;
+
+        pintarBanners();
+        pintarRubros();
+        pintarEstantes();
+        pintarDulces();
+        pintarCatalogo();
+        pintarCarrito();
+        pintarPinata();
+
+        const m = location.hash.match(/^#\/producto\/(.+)$/);
+        if (m) {
+          const prodAbierto = PRODUCTOS.find(x => String(x.id) === String(m[1]));
+          if (prodAbierto) {
+            pintarFicha(prodAbierto);
+          } else {
+            location.hash = '#/';
+          }
+        }
+      } catch (err) {
+        console.error('[TiendaCandy Sync]:', err);
       }
     }
 
@@ -1958,12 +2133,19 @@ export default function TiendaCandy() {
 
     pintarCatalogo();
     router();
+    registrarVisitaUnica(supabase, usuario?.id_cliente || null);
 
     sincronizarRef.current = sincronizarConSupabase;
     sincronizarConSupabase();
+
+    return () => {
+      clearInterval(bannerTimer);
+      clearTimeout(busquedaTimer);
+      ac.abort();
+      sincronizarRef.current = null;
+    };
   }, []);
 
-  // Canal Realtime independiente (no se bloquea con React Strict Mode)
   useEffect(() => {
     const supabase = createClient();
 
@@ -2028,9 +2210,9 @@ export default function TiendaCandy() {
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
             <img
-              src="img/LOGO CANDY.png"
+              src="/img/LOGO%20CANDY.png"
               alt="Dulcerías Candy"
-              onError={(e) => { e.currentTarget.src = 'img/ICONO.png'; }}
+              onError={(e) => { e.currentTarget.src = '/img/ICONO.png'; }}
             />
           </a>
 
@@ -2195,7 +2377,7 @@ export default function TiendaCandy() {
                     <p className="vacio__ico" aria-hidden="true">🔍</p>
                     <h3>No encontramos ese producto</h3>
                     <p>Manejamos más de mil productos en tienda y no todos están en línea todavía.</p>
-                    <a className="btn btn--wa" id="wa-nohay" href="#" target="_blank" rel="noopener">Preguntar por WhatsApp</a>
+                    <a className="btn btn--wa" id="wa-nohay" data-wa-cotizar="no_encontrado" href="#" target="_blank" rel="noopener">Preguntar por WhatsApp</a>
                   </div>
 
                   <nav className="paginas" id="paginas" aria-label="Páginas de resultados"></nav>
@@ -2235,13 +2417,20 @@ export default function TiendaCandy() {
 
                   <div className="pinata__escena">
                     <img
-                      src="img/PIÑATA.png"
+                      src="/img/PI%C3%91ATA.png"
                       alt="Piñata de estrella"
                       id="pinata-img"
                       className="pinata__obj"
                       width="220"
                       height="220"
-                      onError={(e) => { e.currentTarget.src = 'img/Fiesta.png'; }}
+                      onError={(e) => {
+                        const paso = Number(e.currentTarget.dataset.fallback || 0);
+                        const respaldos = ['/img/pinata.png', '/img/Fiesta.png', '/img/ICONO.png'];
+                        if (paso < respaldos.length) {
+                          e.currentTarget.dataset.fallback = String(paso + 1);
+                          e.currentTarget.src = respaldos[paso];
+                        }
+                      }}
                     />
 
                     <svg className="pinata__obj bolsa" id="bolsa-img" viewBox="0 0 200 240" role="img" aria-label="Bolsita de aguinaldo" hidden>
@@ -2408,19 +2597,19 @@ export default function TiendaCandy() {
         <div className="pie__in">
           <div className="pie__col pie__col--marca">
             <span className="pie__logo">
-              <img src="img/LOGO CANDY.png" alt="Dulcerías Candy" onError={(e) => { e.currentTarget.src = 'img/ICONO.png'; }} />
+              <img src="/img/LOGO%20CANDY.png" alt="Dulcerías Candy" onError={(e) => { e.currentTarget.src = '/img/ICONO.png'; }} />
             </span>
             <p>Dulces, chocolates y artículos de fiesta en Puebla desde 1974. Surtimos tu negocio, tu fiesta y tu piñata.</p>
             <p className="pie__rotulo">Síguenos</p>
             <div className="pie__redes">
               <a href="https://www.facebook.com/DulceriaCandy" target="_blank" rel="noopener" aria-label="Facebook">
-                <img src="img/facebook.png" alt="" /><span>Facebook</span>
+                <img src="/img/facebook.png" alt="" /><span>Facebook</span>
               </a>
               <a href="https://www.instagram.com/dulcerias_candy/" target="_blank" rel="noopener" aria-label="Instagram">
-                <img src="img/instagram.png" alt="" /><span>Instagram</span>
+                <img src="/img/instagram.png" alt="" /><span>Instagram</span>
               </a>
               <a href="https://www.tiktok.com/@dulceriacandyoficial" target="_blank" rel="noopener" aria-label="TikTok">
-                <img src="img/tiktok.png" alt="" /><span>TikTok</span>
+                <img src="/img/tiktok.png" alt="" /><span>TikTok</span>
               </a>
             </div>
           </div>
@@ -2526,16 +2715,16 @@ export default function TiendaCandy() {
           <button type="button" className="cerrar cuenta__cerrar" data-cerrar-cuenta aria-label="Cerrar">✕</button>
 
           <aside className="cuenta__lado">
-            <img className="cuenta__dulce cuenta__dulce--1" src="img/Gomita.png" alt="" aria-hidden="true" />
-            <img className="cuenta__dulce cuenta__dulce--2" src="img/Paleta.png" alt="" aria-hidden="true" />
-            <img className="cuenta__dulce cuenta__dulce--3" src="img/Chocolate.png" alt="" aria-hidden="true" />
-            <img className="cuenta__dulce cuenta__dulce--4" src="img/Caramelo.png" alt="" aria-hidden="true" />
+            <img className="cuenta__dulce cuenta__dulce--1" src="/img/Gomita.png" alt="" aria-hidden="true" />
+            <img className="cuenta__dulce cuenta__dulce--2" src="/img/Paleta.png" alt="" aria-hidden="true" />
+            <img className="cuenta__dulce cuenta__dulce--3" src="/img/Chocolate.png" alt="" aria-hidden="true" />
+            <img className="cuenta__dulce cuenta__dulce--4" src="/img/Caramelo.png" alt="" aria-hidden="true" />
 
             <img
               className="cuenta__logo"
-              src="img/LOGO CANDY.png"
+              src="/img/LOGO%20CANDY.png"
               alt="Dulcerías Candy"
-              onError={(e) => { e.currentTarget.src = 'img/ICONO.png'; }}
+              onError={(e) => { e.currentTarget.src = '/img/ICONO.png'; }}
             />
             <p className="cuenta__lema">Tu cuenta <span>más dulce</span></p>
             <ul className="cuenta__beneficios">
@@ -2659,7 +2848,7 @@ export default function TiendaCandy() {
               </div>
             </div>
 
-            <p className="cuenta__nota" id="cuenta-nota">No necesitas cuenta para comprar: también puedes pagar como invitado.</p>
+            <p className="cuenta__nota" id="cuenta-nota">Necesitas una cuenta para finalizar tu compra y dar seguimiento a tus pedidos.</p>
           </div>
         </div>
       </dialog>
@@ -2669,10 +2858,10 @@ export default function TiendaCandy() {
         <div className="pago__caja">
           <header className="pago__head">
             <img
-              src="img/LOGO CANDY.png"
+              src="/img/LOGO%20CANDY.png"
               alt="Dulcerías Candy"
               className="pago__logo"
-              onError={(e) => { e.currentTarget.src = 'img/ICONO.png'; }}
+              onError={(e) => { e.currentTarget.src = '/img/ICONO.png'; }}
             />
             <div>
               <h2 id="pago-t">Finalizar compra</h2>
